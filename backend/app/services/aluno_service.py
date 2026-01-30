@@ -76,7 +76,20 @@ class AlunoService:
             turno=aluno.turno,
             status=aluno.status,
             media=float(media) if media is not None else None,
-            notas=notas_schema
+            notas=notas_schema,
+            # Personal info
+            sexo=aluno.sexo,
+            data_nascimento=aluno.data_nascimento,
+            naturalidade=aluno.naturalidade,
+            zona=aluno.zona,
+            endereco=aluno.endereco,
+            filiacao=aluno.filiacao,
+            telefones=aluno.telefones,
+            cpf=aluno.cpf,
+            nis=aluno.nis,
+            inep=aluno.inep,
+            situacao_anterior=aluno.situacao_anterior,
+            email=aluno.email
         )
 
     def create_aluno(self, data: dict) -> AlunoListSchema:

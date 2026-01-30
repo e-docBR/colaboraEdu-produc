@@ -118,7 +118,7 @@ export const OcorrenciasPage = () => {
                     aluno_id: alunoId,
                     tipo,
                     descricao,
-                    data_ocorrencia: new Date().toISOString()
+                    data_registro: new Date().toISOString()
                 }).unwrap();
             }
             setOpen(false);
@@ -332,7 +332,7 @@ export const OcorrenciasPage = () => {
                                             <Stack direction="row" spacing={0.5} alignItems="center" color="text.secondary">
                                                 <CalendarTodayIcon sx={{ fontSize: 14 }} />
                                                 <Typography variant="caption" fontWeight={500}>
-                                                    {new Date(oc.data_ocorrencia).toLocaleDateString()}
+                                                    {new Date(oc.data_registro).toLocaleDateString()}
                                                 </Typography>
                                             </Stack>
 

@@ -18,9 +18,15 @@ class TurmaService:
         self.repository = TurmaRepository(session)
 
     def _slugify(self, value: str) -> str:
-        normalized = normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
-        slug = "".join(ch if ch.isalnum() else "-" for ch in normalized.strip().lower())
-        return "-".join(filter(None, slug.split("-")))
+        if not value: return ""
+        import re
+        from unicodedata import normalize as u_norm
+        normalized = u_norm("NFKD", value).encode("ascii", "ignore").decode("ascii")
+        # Remove "ANO" to match 7º ANO F with 7º F
+        ascii_value = re.sub(r"\bano\b", "", normalized, flags=re.IGNORECASE)
+        ascii_value = ascii_value.strip().lower()
+        ascii_value = re.sub(r"[^a-z0-9]+", "-", ascii_value)
+        return "-".join(filter(None, ascii_value.split("-")))
 
     def list_turmas(self) -> TurmaListResponse:
         rows = self.repository.get_summaries()

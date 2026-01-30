@@ -29,8 +29,41 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogTitle
+  DialogTitle,
+  Tabs,
+  Tab,
+  Grid
 } from "@mui/material";
+
+import PersonIcon from "@mui/icons-material/Person";
+import HomeIcon from "@mui/icons-material/Home";
+import DescriptionIcon from "@mui/icons-material/Description";
+import GroupIcon from "@mui/icons-material/Group";
+import SchoolIcon from "@mui/icons-material/School";
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function CustomTabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ pt: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
 import { useState } from "react";
 import { useGetAlunoQuery, AlunoNota, useUpdateAlunoMutation, useDeleteAlunoMutation } from "../../lib/api";
 import { useAppSelector } from "../../app/hooks";
@@ -118,6 +151,12 @@ export const AlunoDetailPage = () => {
     }
   };
 
+
+  const [tabValue, setTabValue] = useState(0);
+
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setTabValue(newValue);
+  };
 
   if (isLoading) {
     return (
@@ -216,47 +255,175 @@ export const AlunoDetailPage = () => {
         </CardContent>
       </Card>
 
-      <TableContainer component={Card}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Disciplina</TableCell>
-              <TableCell>1º Tri</TableCell>
-              <TableCell>2º Tri</TableCell>
-              <TableCell>3º Tri</TableCell>
-              <TableCell>Total</TableCell>
-              <TableCell>Faltas</TableCell>
-              <TableCell>Situação</TableCell>
-              {isAdmin && <TableCell>Ações</TableCell>}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {data.notas.map((nota) => {
-              const situacao = formatSituacao(nota.situacao, data.status);
-              return (
-                <TableRow key={nota.id} hover>
-                  <TableCell>{nota.disciplina}</TableCell>
-                  <TableCell>{formatNota(nota.trimestre1)}</TableCell>
-                  <TableCell>{formatNota(nota.trimestre2)}</TableCell>
-                  <TableCell>{formatNota(nota.trimestre3)}</TableCell>
-                  <TableCell>{formatNota(nota.total)}</TableCell>
-                  <TableCell>{nota.faltas ?? "-"}</TableCell>
-                  <TableCell>
-                    <Chip label={situacao.label} color={situacao.color} size="small" variant="outlined" />
-                  </TableCell>
-                  {isAdmin && (
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mt: 1 }}>
+        <Tabs value={tabValue} onChange={handleTabChange} color="secondary">
+          <Tab icon={<SchoolIcon fontSize="small" />} iconPosition="start" label="Acadêmico" />
+          <Tab icon={<PersonIcon fontSize="small" />} iconPosition="start" label="Dados Pessoais" />
+        </Tabs>
+      </Box>
+
+      <CustomTabPanel value={tabValue} index={0}>
+        <TableContainer component={Card}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Disciplina</TableCell>
+                <TableCell>1º Tri</TableCell>
+                <TableCell>2º Tri</TableCell>
+                <TableCell>3º Tri</TableCell>
+                <TableCell>Total</TableCell>
+                <TableCell>Faltas</TableCell>
+                <TableCell>Situação</TableCell>
+                {isAdmin && <TableCell>Ações</TableCell>}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data.notas.map((nota) => {
+                const situacao = formatSituacao(nota.situacao, data.status);
+                return (
+                  <TableRow key={nota.id} hover>
+                    <TableCell>{nota.disciplina}</TableCell>
+                    <TableCell>{formatNota(nota.trimestre1)}</TableCell>
+                    <TableCell>{formatNota(nota.trimestre2)}</TableCell>
+                    <TableCell>{formatNota(nota.trimestre3)}</TableCell>
+                    <TableCell>{formatNota(nota.total)}</TableCell>
+                    <TableCell>{nota.faltas ?? "-"}</TableCell>
                     <TableCell>
-                      <IconButton size="small" onClick={() => setEditingNota(nota)}>
-                        <EditIcon fontSize="small" />
-                      </IconButton>
+                      <Chip label={situacao.label} color={situacao.color} size="small" variant="outlined" />
                     </TableCell>
-                  )}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                    {isAdmin && (
+                      <TableCell>
+                        <IconButton size="small" onClick={() => setEditingNota(nota)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </CustomTabPanel>
+
+      <CustomTabPanel value={tabValue} index={1}>
+        <Grid container spacing={3}>
+          {/* Informações Pessoais */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" mb={2}>
+                  <PersonIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>Identificação Básica</Typography>
+                </Stack>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">Sexo</Typography>
+                    <Typography fontWeight={500}>{data.sexo || "-"}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">Data de Nasc.</Typography>
+                    <Typography fontWeight={500}>{data.data_nascimento || "-"}</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">Naturalidade</Typography>
+                    <Typography fontWeight={500}>{data.naturalidade || "-"}</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">Situação no Ano Anterior</Typography>
+                    <Typography fontWeight={500}>{data.situacao_anterior || "-"}</Typography>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Documentação */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" mb={2}>
+                  <DescriptionIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>Documentação & Registro</Typography>
+                </Stack>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">INEP</Typography>
+                    <Typography fontWeight={500}>{data.inep || "-"}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">CPF</Typography>
+                    <Typography fontWeight={500}>{data.cpf || "-"}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="caption" color="text.secondary">NIS</Typography>
+                    <Typography fontWeight={500}>{data.nis || "-"}</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="text.secondary">Status do Aluno</Typography>
+                    <Typography fontWeight={500}>
+                      <Chip
+                        label={data.status || "Ativo"}
+                        size="small"
+                        color={data.status === "Cancelado" || data.status === "Desistente" ? "error" : "success"}
+                        variant="filled"
+                      />
+                    </Typography>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Endereço e Contato */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" mb={2}>
+                  <HomeIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>Contato e Endereço</Typography>
+                </Stack>
+                <Stack spacing={2}>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Endereço</Typography>
+                    <Typography fontWeight={500}>{data.endereco || "-"}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Zona</Typography>
+                    <Typography fontWeight={500}>{data.zona || "-"}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Telefones</Typography>
+                    <Typography fontWeight={500}>{data.telefones || "-"}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Email</Typography>
+                    <Typography fontWeight={500}>{data.email || "-"}</Typography>
+                  </Box>
+                </Stack>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* Filiação */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ height: '100%' }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center" mb={2}>
+                  <GroupIcon color="primary" />
+                  <Typography variant="h6" fontWeight={600}>Filiação e Família</Typography>
+                </Stack>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Filiação</Typography>
+                  <Typography fontWeight={500} sx={{ whiteSpace: 'pre-line' }}>
+                    {data.filiacao || "-"}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </CustomTabPanel>
 
       {editingNota && (
         <EditNotaDialog

@@ -37,10 +37,22 @@ class ParsedAlunoRecord:
     turma: str | None
     turno: str | None
     notas: list[ParsedNotaRecord] = field(default_factory=list)
+    # Personal info
+    sexo: str | None = None
+    data_nascimento: str | None = None
+    naturalidade: str | None = None
+    zona: str | None = None
+    endereco: str | None = None
+    filiacao: str | None = None
+    telefones: str | None = None
+    cpf: str | None = None
+    nis: str | None = None
+    inep: str | None = None
+    situacao_anterior: str | None = None
 
 
 STUDENT_META_PATTERN = re.compile(
-    r"Aluno\(a\):\s*(?P<nome>.+?)\s+Matr[ií]cula:\s*(?P<matricula>\d+)",
+    r"Aluno(?:\(a\))?:\s*(?P<nome>.+?)\s+Matr[ií]cula:\s*(?P<matricula>\d+)",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -48,6 +60,11 @@ BOLETIM_YEAR_PATTERN = re.compile(
     r"BOLETIM ESCOLAR\s*-\s*(?P<year>\d{4})",
     re.IGNORECASE
 )
+
+MI_HEADER_SIGNAL = "MATRÍCULA INICIAL"
+MI_TURMA_PATTERN = re.compile(r"Série:\s*(?P<content>.+?)(?:\s+INEP|$)")
+MI_TURNO_PATTERN = re.compile(r"Turno:\s*(?P<turno>\w+)")
+MI_YEAR_PATTERN = re.compile(r"Ano:\s*(?P<year>\d{4})")
 
 
 from ..core.queue import queue
@@ -70,6 +87,8 @@ def process_pdf(filepath: Path, *, turno: str | None = None, turma: str | None =
     errors: list[str] = []
     records, extracted_year = parse_pdf(filepath, errors, turno=turno, turma=turma)
     
+    final_year_label = "Desconhecido"
+
     # Resolve academic year if extracted from PDF
     if extracted_year and tenant_id:
         with session_scope() as session:
@@ -83,16 +102,23 @@ def process_pdf(filepath: Path, *, turno: str | None = None, turma: str | None =
                 session.commit()
                 logger.info("Created new AcademicYear {} for tenant {}", extracted_year, tenant_id)
             academic_year_id = year_obj.id
+            final_year_label = year_obj.label
+    elif academic_year_id:
+        # Fetch label for passed ID
+         with session_scope() as session:
+            year_obj = session.get(AcademicYear, academic_year_id)
+            if year_obj:
+                final_year_label = year_obj.label
 
     count = 0
     if not records:
-        msg = f"Nenhum registro encontrado no boletim {filepath.name}"
+        msg = f"Nenhum registro encontrado no boletim {filepath.name}. Verifique se o PDF contém 'Aluno(a): ... Matrícula: ...'"
         logger.warning(msg)
         errors.append(msg)
     else:
         count = apply_records(records, tenant_id=tenant_id, academic_year_id=academic_year_id)
     
-    return {"count": count, "logs": errors}
+    return {"count": count, "logs": errors, "year": final_year_label}
 
 
 def apply_records(records: Sequence[ParsedAlunoRecord], tenant_id: int | None = None, academic_year_id: int | None = None) -> int:
@@ -115,7 +141,25 @@ def apply_records(records: Sequence[ParsedAlunoRecord], tenant_id: int | None = 
 def parse_pdf(filepath: Path, errors: list[str], *, turno: str | None = None, turma: str | None = None) -> tuple[list[ParsedAlunoRecord], int | None]:
     parsed: dict[str, ParsedAlunoRecord] = {}
     extracted_year = None
+    
     with pdfplumber.open(str(filepath)) as pdf:
+        first_page_text = (pdf.pages[0].extract_text() or "").upper()
+        # Basic normalization: remove accents for matching
+        norm_text = u_normalize("NFKD", first_page_text).encode("ascii", "ignore").decode("ascii")
+        
+        logger.info(f"DEBUG: Processing {filepath.name}")
+        logger.info(f"DEBUG: First page text len: {len(first_page_text)}")
+        logger.info(f"DEBUG: Norm text snippet: {norm_text[:200]}")
+        
+        # Check if it is a Matrícula Inicial/Final file
+        is_mi = "MATRICULA INICIAL" in norm_text or "MATRICULA FINAL" in norm_text
+        logger.info(f"DEBUG: is_mi detected: {is_mi}")
+        
+        if is_mi:
+            logger.info("Detected Matrícula Inicial/Final format for {}", filepath.name)
+            return _parse_matricula_inicial(pdf, errors, turno=turno, turma=turma)
+
+        # Standard Bulletin format
         for page in pdf.pages:
             text = page.extract_text() or ""
             
@@ -128,10 +172,6 @@ def parse_pdf(filepath: Path, errors: list[str], *, turno: str | None = None, tu
             tables = page.extract_tables() or []
             student_metas = _extract_student_meta(text)
             if not student_metas:
-                # msg = f"Página {page.page_number} sem metadados (ignorada)."
-                # logger.warning(msg)
-                # errors.append(msg)
-                # Omit noise, only log real issues if needed
                 continue
 
             for idx, meta in enumerate(student_metas):
@@ -181,6 +221,90 @@ def parse_pdf(filepath: Path, errors: list[str], *, turno: str | None = None, tu
                         )
                     )
     return list(parsed.values()), extracted_year
+
+
+def _parse_matricula_inicial(pdf: pdfplumber.PDF, errors: list[str], *, turno: str | None = None, turma: str | None = None) -> tuple[list[ParsedAlunoRecord], int | None]:
+    parsed_alunos: list[ParsedAlunoRecord] = []
+    extracted_year = None
+    
+    file_turma = turma
+    file_turno = turno
+
+    for page in pdf.pages:
+        text = page.extract_text() or ""
+        
+        # Extract Turma/Turno/Year if not already set (usually on first page)
+        if extracted_year is None:
+            year_match = MI_YEAR_PATTERN.search(text)
+            if year_match:
+                extracted_year = int(year_match.group("year"))
+        
+        if file_turma is None:
+            tm = MI_TURMA_PATTERN.search(text)
+            if tm:
+                content = tm.group("content").strip()
+                # Content might be "6º ANO A MATUTINO"
+                t_name, t_turno = _split_turma_turno(content)
+                file_turma = t_name
+                if file_turno is None:
+                    file_turno = t_turno
+
+        if file_turno is None:
+            tn = MI_TURNO_PATTERN.search(text)
+            if tn:
+                file_turno = tn.group("turno").capitalize()
+
+        tables = page.extract_tables() or []
+        for table in tables:
+            if not table or len(table) < 2:
+                continue
+            
+            # Identificamos cabeçalho? A MI tem colunas fixas: 
+            # 0:Nº, 1:Nome, 2:Sexo, 3:Nasc, 4:Natural, 5:Zona, 6:Endereço, 7:Filiação, 8:Telefones, 9:CPF, 10:NIS, 11:INEP, 12:Situação
+            # Algumas tabelas podem vir com sub-cabeçalhos, vamos filtrar pelo index na primeira coluna
+            for row in table:
+                if not row or len(row) < 12:
+                    continue
+                
+                idx_str = (row[0] or "").strip()
+                if not idx_str.isdigit():
+                    continue # Skip header rows
+                
+                nome = (row[1] or "").strip()
+                if not nome or "NOME DO ALUNO" in nome.upper():
+                    continue
+                
+                # INEP ou CPF como matrícula
+                inep = (row[11] or "").strip()
+                cpf = (row[9] or "").strip().replace(".", "").replace("-", "")
+                
+                # Usamos INEP se disponível, senão CPF, senão geramos um baseado no nome
+                matricula = inep if len(inep) >= 5 else (cpf if len(cpf) >= 5 else f"SEM-{_slugify(nome)[:10]}")
+                
+                if not matricula:
+                    continue
+
+                parsed_alunos.append(
+                    ParsedAlunoRecord(
+                        matricula=matricula,
+                        nome=nome,
+                        turma=file_turma,
+                        turno=file_turno,
+                        sexo=(row[2] or "").strip(),
+                        data_nascimento=(row[3] or "").strip(),
+                        naturalidade=(row[4] or "").strip(),
+                        zona=(row[5] or "").strip(),
+                        endereco=(row[6] or "").strip().replace("\n", " "),
+                        filiacao=(row[7] or "").strip().replace("\n", " "),
+                        telefones=(row[8] or "").strip(),
+                        cpf=cpf,
+                        nis=(row[10] or "").strip(),
+                        inep=inep,
+                        situacao_anterior=(row[12] or "").strip(),
+                    )
+                )
+    
+    return parsed_alunos, extracted_year
 
 
 def _extract_student_meta(text: str) -> list[dict[str, str | None]]:
@@ -278,11 +402,21 @@ def _extract_rows(tables: Sequence[Sequence[Sequence[str | None]]]) -> Iterable[
 
 
 def _upsert_aluno(session: Session, record: ParsedAlunoRecord, tenant_id: int | None = None, academic_year_id: int | None = None) -> Aluno:
+    # 1. Try by matricula first (Standard)
     stmt = select(Aluno).where(
         Aluno.matricula == record.matricula,
         Aluno.tenant_id == tenant_id
     )
     aluno = session.execute(stmt).scalar_one_or_none()
+    
+    # 2. Try by Name as fallback (Prevents duplicates between MI and Bulletin if IDs differ)
+    if aluno is None and record.nome:
+        stmt = select(Aluno).where(
+            Aluno.nome == record.nome,
+            Aluno.tenant_id == tenant_id
+        )
+        aluno = session.execute(stmt).scalar_one_or_none()
+
     if aluno is None:
         aluno = Aluno(
             matricula=record.matricula,
@@ -290,18 +424,50 @@ def _upsert_aluno(session: Session, record: ParsedAlunoRecord, tenant_id: int | 
             turma=record.turma or "",
             turno=record.turno or "",
             tenant_id=tenant_id,
-            academic_year_id=academic_year_id
+            academic_year_id=academic_year_id,
+            sexo=record.sexo,
+            data_nascimento=record.data_nascimento,
+            naturalidade=record.naturalidade,
+            zona=record.zona,
+            endereco=record.endereco,
+            filiacao=record.filiacao,
+            telefones=record.telefones,
+            cpf=record.cpf,
+            nis=record.nis,
+            inep=record.inep,
+            situacao_anterior=record.situacao_anterior
         )
         session.add(aluno)
         session.flush()
         ensure_aluno_user(session, aluno)
         return aluno
+
+    # Update existing
     aluno.nome = record.nome or aluno.nome
     aluno.academic_year_id = academic_year_id # Update to current processing year
+    
+    # Update personal info if provided
+    if record.sexo: aluno.sexo = record.sexo
+    if record.data_nascimento: aluno.data_nascimento = record.data_nascimento
+    if record.naturalidade: aluno.naturalidade = record.naturalidade
+    if record.zona: aluno.zona = record.zona
+    if record.endereco: aluno.endereco = record.endereco
+    if record.filiacao: aluno.filiacao = record.filiacao
+    if record.telefones: aluno.telefones = record.telefones
+    if record.cpf: aluno.cpf = record.cpf
+    if record.nis: aluno.nis = record.nis
+    if record.inep: aluno.inep = record.inep
+    if record.situacao_anterior: aluno.situacao_anterior = record.situacao_anterior
+
+    # Only update matricula if it was a placeholder SEM- and we now have a real one
+    if aluno.matricula.startswith("SEM-") and not record.matricula.startswith("SEM-"):
+        aluno.matricula = record.matricula
+
     if record.turma:
         aluno.turma = record.turma
     if record.turno:
         aluno.turno = record.turno
+    
     ensure_aluno_user(session, aluno)
     return aluno
 
@@ -383,9 +549,11 @@ def _slugify(value: str) -> str:
         return ""
     normalized = u_normalize("NFKD", value)
     ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+    # Remove "ANO" to match 7º ANO F with 7º F
+    ascii_value = re.sub(r"\bano\b", "", ascii_value, flags=re.IGNORECASE)
     ascii_value = ascii_value.strip().lower()
     ascii_value = re.sub(r"[^a-z0-9]+", "-", ascii_value)
-    return ascii_value.strip("-")
+    return "-".join(filter(None, ascii_value.split("-")))
 
 
 def _parse_float(value: str | None) -> float | None:

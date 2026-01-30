@@ -18,8 +18,6 @@ class OcorrenciaService:
         """
         results = self.repository.list_filtered(aluno_id)
         
-        # Manually mapping to Schema to include convenient strings
-        # Ideally this should be done by the schema or a mapper function
         schemas = []
         for o in results:
             schemas.append(OcorrenciaSchema(
@@ -28,19 +26,18 @@ class OcorrenciaService:
                 autor_id=o.autor_id,
                 tipo=o.tipo,
                 descricao=o.descricao,
-                resolvida=o.resolvida,
-                data_ocorrencia=o.data_ocorrencia,
-                created_at=o.created_at,
+                data_registro=o.data_registro,
                 aluno_nome=o.aluno.nome if o.aluno else "Desconhecido",
                 autor_nome=o.autor.username if o.autor else "Sistema"
             ))
         return schemas
 
     def create(self, data: OcorrenciaCreate) -> OcorrenciaSchema:
+        from flask import g
         dt = datetime.now()
-        if data.data_ocorrencia:
+        if data.data_registro:
              try:
-                dt = datetime.fromisoformat(data.data_ocorrencia)
+                dt = datetime.fromisoformat(data.data_registro)
              except:
                 pass
 
@@ -49,8 +46,9 @@ class OcorrenciaService:
             "autor_id": self.user_id,
             "tipo": data.tipo,
             "descricao": data.descricao,
-            "data_ocorrencia": dt,
-            "resolvida": data.resolvida
+            "data_registro": dt,
+            "tenant_id": g.tenant_id,
+            "academic_year_id": g.academic_year_id
         }
         
         novo = self.repository.create(payload)
@@ -65,20 +63,15 @@ class OcorrenciaService:
             {"tipo": novo.tipo, "aluno_id": novo.aluno_id}
         )
         
-        # Return summary schema (we might need to reload to get relationships for names)
-        # For performance we can just return what we have or reload
-        # self.repository.session.refresh(novo) # Already done in create
         return OcorrenciaSchema(
              id=novo.id,
                 aluno_id=novo.aluno_id,
                 autor_id=novo.autor_id,
                 tipo=novo.tipo,
                 descricao=novo.descricao,
-                resolvida=novo.resolvida,
-                data_ocorrencia=novo.data_ocorrencia,
-                created_at=novo.created_at,
-                aluno_nome=novo.aluno.nome if novo.aluno else "Desconhecido", # might fail if not eager loaded
-                autor_nome="Eu" # Simplified for create response or force reload
+                data_registro=novo.data_registro,
+                aluno_nome=novo.aluno.nome if novo.aluno else "Desconhecido",
+                autor_nome="Eu" # Simplified
         )
 
     def update(self, id: int, data: OcorrenciaUpdate) -> Optional[OcorrenciaSchema]:
@@ -105,9 +98,7 @@ class OcorrenciaService:
                 autor_id=updated.autor_id,
                 tipo=updated.tipo,
                 descricao=updated.descricao,
-                resolvida=updated.resolvida,
-                data_ocorrencia=updated.data_ocorrencia,
-                created_at=updated.created_at,
+                data_registro=updated.data_registro,
                 aluno_nome=updated.aluno.nome if updated.aluno else "Desconhecido",
                 autor_nome=updated.autor.username if updated.autor else "Sistema"
         )

@@ -10,8 +10,16 @@ class OcorrenciaRepository(BaseRepository[Ocorrencia]):
         super().__init__(session, Ocorrencia)
 
     def list_filtered(self, aluno_id: Optional[int] = None) -> List[Ocorrencia]:
-        query = select(self.model).order_by(desc(self.model.data_ocorrencia))
+        from flask import g
+        tenant_id = getattr(g, "tenant_id", None)
+        academic_year_id = getattr(g, "academic_year_id", None)
+
+        query = select(self.model).order_by(desc(self.model.data_registro))
         
+        if tenant_id:
+            query = query.where(self.model.tenant_id == tenant_id)
+        if academic_year_id:
+            query = query.where(self.model.academic_year_id == academic_year_id)
         if aluno_id:
             query = query.where(self.model.aluno_id == aluno_id)
             

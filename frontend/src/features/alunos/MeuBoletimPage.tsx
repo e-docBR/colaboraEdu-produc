@@ -42,6 +42,7 @@ const formatSituacao = (value?: string | null) => {
   if (normalized.startsWith("REC")) return { label: "Recuperação", color: "warning" as const };
   if (normalized.startsWith("REP")) return { label: "Reprovado", color: "error" as const };
   if (normalized.startsWith("APCC")) return { label: "APCC", color: "info" as const };
+  if (normalized === "AR") return { label: "AR", color: "default" as const, variant: "filled" };
   return { label: value, color: "default" as const };
 };
 
@@ -138,7 +139,7 @@ export const MeuBoletimPage = () => {
           <Box mt={2} display="flex" justifyContent="flex-end">
             <Button
               variant="contained"
-              color="secondary"
+              color="success"
               startIcon={<DownloadIcon />}
               onClick={handleDownloadPdf}
             >
@@ -212,7 +213,7 @@ export const MeuBoletimPage = () => {
                           <Typography fontWeight={600} component="div">
                             {oc.tipo}
                             <Typography component="span" variant="caption" color="text.secondary" ml={2}>
-                              {new Date(oc.data_ocorrencia).toLocaleDateString()}
+                              {new Date(oc.data_registro).toLocaleDateString()}
                             </Typography>
                           </Typography>
                         }

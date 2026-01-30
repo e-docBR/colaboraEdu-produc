@@ -21,6 +21,20 @@ class AlunoBase(BaseModel):
     turma: str
     turno: str
     status: Optional[str] = None
+    
+    # Personal info
+    sexo: Optional[str] = None
+    data_nascimento: Optional[str] = None
+    naturalidade: Optional[str] = None
+    zona: Optional[str] = None
+    endereco: Optional[str] = None
+    filiacao: Optional[str] = None
+    telefones: Optional[str] = None
+    cpf: Optional[str] = None
+    nis: Optional[str] = None
+    inep: Optional[str] = None
+    situacao_anterior: Optional[str] = None
+    email: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,6 +65,18 @@ class AlunoUpdate(BaseModel):
     turma: Optional[str] = None
     turno: Optional[str] = None
     status: Optional[str] = None
+    sexo: Optional[str] = None
+    data_nascimento: Optional[str] = None
+    naturalidade: Optional[str] = None
+    zona: Optional[str] = None
+    endereco: Optional[str] = None
+    filiacao: Optional[str] = None
+    telefones: Optional[str] = None
+    cpf: Optional[str] = None
+    nis: Optional[str] = None
+    inep: Optional[str] = None
+    situacao_anterior: Optional[str] = None
+    email: Optional[str] = None
 
 class AlunoPaginatedResponse(BaseModel):
     items: List[AlunoListSchema]

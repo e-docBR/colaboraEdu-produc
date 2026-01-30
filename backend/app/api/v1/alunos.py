@@ -112,10 +112,13 @@ def register(parent: Blueprint) -> None:
             if not aluno_data:
                 return jsonify({"error": "Aluno não encontrado"}), 404
             
-            school_name = g.get("tenant").name if g.get("tenant") else "ColaboraFREI"
-            year_label = "2026" # Fallback
+            from ...models import Tenant, AcademicYear
+            
+            tenant = session.get(Tenant, g.tenant_id)
+            school_name = tenant.name if tenant else "ColaboraEDU"
+            
+            year_label = "2025"
             if g.get("academic_year_id"):
-                 from ...models.academic_year import AcademicYear
                  year = session.get(AcademicYear, g.academic_year_id)
                  if year:
                      year_label = year.label

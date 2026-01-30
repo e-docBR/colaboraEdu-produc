@@ -1,4 +1,4 @@
-import { Box, Button, MenuItem, TextField } from "@mui/material";
+import { Box, Button, MenuItem, TextField, Divider, Grid } from "@mui/material";
 import { useEffect, useState } from "react";
 import { AlunoSummary } from "../../lib/api";
 
@@ -25,9 +25,38 @@ export const AlunoForm = ({ initialData, onSubmit, onCancel, isLoading }: AlunoF
         }
     }, [initialData]);
 
+    const formatPhoneNumber = (value: string) => {
+        const digits = value.replace(/\D/g, "");
+        if (digits.length <= 10) {
+            return digits.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+        } else {
+            return digits.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+        }
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        let newValue = value;
+        if (name === "telefones") {
+            // Only apply mask if the user is typing standard digits
+            // Allow deleting (backspace) without forcing formatting weirdly
+            // Simple "as you type" mask logic
+            const raw = value.replace(/\D/g, "");
+            if (raw.length <= 11) {
+                // If it looks like a single phone number, Format it
+                if (raw.length > 2 && raw.length <= 6) {
+                    newValue = `(${raw.slice(0, 2)}) ${raw.slice(2)}`;
+                } else if (raw.length > 6 && raw.length <= 10) {
+                    newValue = `(${raw.slice(0, 2)}) ${raw.slice(2, 6)}-${raw.slice(6)}`;
+                } else if (raw.length > 10) {
+                    newValue = `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7, 11)}`;
+                } else {
+                    newValue = raw;
+                }
+            }
+            // If larger (multiple phones), let it match default behavior or just raw
+        }
+        setFormData(prev => ({ ...prev, [name]: newValue }));
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -104,6 +133,147 @@ export const AlunoForm = ({ initialData, onSubmit, onCancel, isLoading }: AlunoF
                 <MenuItem value="Transferido">Transferido</MenuItem>
                 <MenuItem value="Desistente">Desistente</MenuItem>
             </TextField>
+
+            <Divider sx={{ my: 2 }}>Dados Pessoais</Divider>
+
+            <Grid container spacing={2}>
+                <Grid item xs={6}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Sexo"
+                        name="sexo"
+                        value={formData.sexo ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Data de Nascimento"
+                        name="data_nascimento"
+                        value={formData.data_nascimento ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Naturalidade"
+                        name="naturalidade"
+                        value={formData.naturalidade ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Endereço"
+                        name="endereco"
+                        value={formData.endereco ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                        multiline
+                        rows={2}
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Zona"
+                        name="zona"
+                        value={formData.zona ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Telefones"
+                        name="telefones"
+                        value={formData.telefones ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Email"
+                        name="email"
+                        value={formData.email ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="CPF"
+                        name="cpf"
+                        value={formData.cpf ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={6}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="NIS"
+                        name="nis"
+                        value={formData.nis ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="INEP"
+                        name="inep"
+                        value={formData.inep ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Filiação"
+                        name="filiacao"
+                        value={formData.filiacao ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                        multiline
+                        rows={2}
+                    />
+                </Grid>
+                <Grid item xs={12}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        label="Situação no Ano Anterior"
+                        name="situacao_anterior"
+                        value={formData.situacao_anterior ?? ""}
+                        onChange={handleChange}
+                        size="small"
+                    />
+                </Grid>
+            </Grid>
 
             <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end", gap: 2 }}>
                 <Button onClick={onCancel}>

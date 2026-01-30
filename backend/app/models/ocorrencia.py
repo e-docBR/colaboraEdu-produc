@@ -12,9 +12,7 @@ class Ocorrencia(Base, TenantYearMixin):
     
     tipo: Mapped[str] = mapped_column(String(50), nullable=False) # Advertência, Elogio, etc
     descricao: Mapped[str] = mapped_column(Text, nullable=False)
-    data_ocorrencia: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    resolvida: Mapped[bool] = mapped_column(default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    data_registro: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     
     aluno_id: Mapped[int] = mapped_column(ForeignKey("alunos.id"), nullable=False)
     autor_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
@@ -31,7 +29,5 @@ class Ocorrencia(Base, TenantYearMixin):
             "autor_nome": self.autor.username if self.autor else "Sistema",
             "tipo": self.tipo,
             "descricao": self.descricao,
-            "data_ocorrencia": self.data_ocorrencia.isoformat(),
-            "resolvida": self.resolvida,
-            "created_at": self.created_at.isoformat()
+            "data_registro": self.data_registro.isoformat()
         }

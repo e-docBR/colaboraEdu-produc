@@ -175,9 +175,8 @@ export const TopBar = ({ onMenuClick }: { onMenuClick?: () => void }) => {
   };
   const handleLogout = () => {
     handleMenuClose();
-    const targetUrl = user?.role === "aluno" ? "/login?perfil=aluno" : "/login";
     dispatch(logout());
-    navigate(targetUrl, { replace: true });
+    window.location.href = "https://colaboraedu.cloud/";
   };
 
   const handleAddPhoto = () => {

@@ -38,8 +38,8 @@ export const UploadsPage = () => {
   useEffect(() => {
     if (jobStatus) {
       if (jobStatus.status === "finished") {
-        const { count, logs } = jobStatus.result || { count: 0, logs: [] };
-        let msg = `Concluído! ${count} registros processados.`;
+        const { count, logs, year } = jobStatus.result || { count: 0, logs: [], year: "?" };
+        let msg = `Concluído! ${count} registros processados para o Ano Letivo: ${year}.`;
         if (logs && logs.length > 0) {
           msg += ` (${logs.length} avisos encontrados)`;
           console.warn("Logs de processamento:", logs);
