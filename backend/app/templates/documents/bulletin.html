@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {
+            size: A4;
+            margin: 1cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            line-height: 1.4;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #14b8a6;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .school-name {
+            font-size: 20px;
+            font-weight: bold;
+            color: #14b8a6;
+        }
+        .doc-title {
+            font-size: 18px;
+            margin-top: 5px;
+        }
+        .student-info {
+            margin-bottom: 20px;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #14b8a6;
+            color: white;
+        }
+        .disciplina-cell {
+            text-align: left;
+            font-weight: bold;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 12px;
+            color: #777;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #0d9488;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="school-name">{{ school_name }}</div>
+        <div class="doc-title">Boletim Escolar - Ano Letivo {{ year }}</div>
+    </div>
+
+    <div class="student-info">
+        <p><strong>Aluno:</strong> {{ aluno.nome }}</p>
+        <p><strong>Matrícula:</strong> {{ aluno.matricula }} | <strong>Turma:</strong> {{ aluno.turma }} | <strong>Turno:</strong> {{ aluno.turno }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 40%;">Disciplina</th>
+                <th>1º Tri</th>
+                <th>2º Tri</th>
+                <th>3º Tri</th>
+                <th>Média</th>
+                <th>Faltas</th>
+                <th>Situação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nota in aluno.notas %}
+            <tr>
+                <td class="disciplina-cell">{{ nota.disciplina }}</td>
+                <td>{{ nota.trimestre1 or '-' }}</td>
+                <td>{{ nota.trimestre2 or '-' }}</td>
+                <td>{{ nota.trimestre3 or '-' }}</td>
+                <td class="highlight">{{ nota.total or '-' }}</td>
+                <td>{{ nota.faltas or 0 }}</td>
+                <td>{{ nota.situacao or '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Este documento foi gerado pelo Sistema ColaboraFREI em {{ aluno.generated_at }}</p>
+        <p>Assinatura da Coordenação: ___________________________________________</p>
+    </div>
+</body>
+</html>

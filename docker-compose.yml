@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: colabora_edu
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5440:5432"
+    networks:
+      - app_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: [ "sh", "-c", "flask --app app create-admin && flask --app app run --host=0.0.0.0 --port=5000" ]
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    environment:
+      FLASK_APP: app
+      FLASK_DEBUG: "1"
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/colabora_edu
+      REDIS_URL: redis://redis:6379/0
+      ALLOWED_ORIGINS: '["http://localhost:5173", "http://127.0.0.1:5173"]'
+      UPLOAD_FOLDER: /data/uploads
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: [ "rq", "worker", "default", "--url", "redis://redis:6379/0" ]
+    volumes:
+      - ./backend:/app
+      - ./data:/data
+    environment:
+      FLASK_APP: app
+      DATABASE_URL: postgresql://postgres:password@postgres:5432/colabora_edu
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_FOLDER: /data/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6389:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: /api/v1
+    depends_on:
+      - backend
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
