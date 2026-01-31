@@ -325,6 +325,7 @@ def _extract_student_meta_blocks(text: str) -> list[dict[str, str | None]]:
             turma_content = turma_line.split(":", 1)[1].strip()
             principal = turma_content.split("- -")[0].strip()
             turma_name, turno_name = _split_turma_turno(principal)
+            turma_name = _normalize_turma_name(turma_name)
         metas.append(
             {
                 "nome": match.group("nome").strip(),
@@ -351,7 +352,7 @@ def _extract_single_student_meta(text: str) -> dict[str, str | None]:
         turma_content = turma_line.split(":", 1)[1].strip()
         principal = turma_content.split("- -")[0].strip()
         turma_name, turno_name = _split_turma_turno(principal)
-        meta["turma"] = turma_name
+        meta["turma"] = _normalize_turma_name(turma_name)
         meta["turno"] = turno_name
 
     return meta
@@ -370,6 +371,42 @@ def _split_turma_turno(value: str) -> tuple[str | None, str | None]:
         tokens = tokens[:-1]
     turma = " ".join(tokens).strip()
     return (turma or None, turno)
+
+
+def _normalize_turma_name(name: str | None) -> str | None:
+    """Standardizes turma names to 'Xº Y' format.
+    Example: '6º ANO A' -> '6º A', '6A' -> '6º A', '6o A' -> '6º A'
+    """
+    if not name:
+        return name
+
+    # 1. Basic cleaning
+    name = " ".join(name.split()).upper()
+
+    # 2. Handle "ANO(S)" / "SERIE"
+    name = re.sub(r"\bANOS?\b\.?", "", name)
+    name = re.sub(r"\bS[EÉ]RIE\b\.?", "", name)
+
+    # 3. Handle numbers followed by letter directly (e.g., 6A -> 6º A)
+    # Match digit(s) followed optionally by 'o' or 'º' or 'ª' then space or letter
+    match = re.search(r"(?P<num>\d+)\s*(?P<ord>[º°ºªoa])?\s*(?P<letra>[A-Z])$", name)
+    if match:
+        num = match.group("num")
+        letra = match.group("letra")
+        return f"{num}º {letra}"
+
+    # 4. Handle just number + letter (no or dinal) at the end if step 3 missed it
+    # Sometimes it's like 'TURMA 6 A'
+    match = re.search(r"\b(?P<num>\d+)\s+(?P<letra>[A-Z])\b", name)
+    if match:
+        return f"{match.group('num')}º {match.group('letra')}"
+
+    # 5. Final fallback cleanup
+    name = " ".join(name.split())
+    # Ensure there is a º after the number if missing
+    name = re.sub(r"(\d+)(?!\s*º)\s*", r"\1º ", name)
+    
+    return " ".join(name.split()).strip()
 
 
 def _extract_rows(tables: Sequence[Sequence[Sequence[str | None]]]) -> Iterable[dict[str, str]]:
@@ -462,7 +499,7 @@ def _upsert_aluno(session: Session, record: ParsedAlunoRecord, tenant_id: int | 
         aluno.matricula = record.matricula
 
     if record.turma:
-        aluno.turma = record.turma
+        aluno.turma = _normalize_turma_name(record.turma)
     if record.turno:
         aluno.turno = record.turno
     

@@ -15,6 +15,10 @@ All notable changes to this project will be documented in this file.
 - **📧 Automated Notifications (Enhanced)**:
     - **Contextual Alerts**: WhatsApp and Email notifications now include the severity level of the occurrence.
     - **Reliability**: Fixed TypeScript build errors in the frontend API layer to ensure stable production deployments.
+- **🏫 Turma Standardization**:
+    - **Uniform Naming**: Standardized all class names to the `Xº LETRA` format (e.g., "6º A", "7º D").
+    - **Database Migration**: Cleaned up 502 existing records to consolidate duplicates (e.g., merging "6º ANO D" into "6º D").
+    - **Auto-Normalization**: Ingestion service now automatically formats class names during PDF uploads to prevent future inconsistencies.
 
 ## [1.2.1] - 2026-01-30
 
