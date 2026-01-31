@@ -224,7 +224,7 @@ def parse_pdf(filepath: Path, errors: list[str], *, turno: str | None = None, tu
 
 
 def _parse_matricula_inicial(pdf: pdfplumber.PDF, errors: list[str], *, turno: str | None = None, turma: str | None = None) -> tuple[list[ParsedAlunoRecord], int | None]:
-    parsed_alunos: list[ParsedAlunoRecord] = []
+    parsed_alunos: dict[str, ParsedAlunoRecord] = {}
     extracted_year = None
     
     file_turma = turma
@@ -259,9 +259,6 @@ def _parse_matricula_inicial(pdf: pdfplumber.PDF, errors: list[str], *, turno: s
             if not table or len(table) < 2:
                 continue
             
-            # Identificamos cabeçalho? A MI tem colunas fixas: 
-            # 0:Nº, 1:Nome, 2:Sexo, 3:Nasc, 4:Natural, 5:Zona, 6:Endereço, 7:Filiação, 8:Telefones, 9:CPF, 10:NIS, 11:INEP, 12:Situação
-            # Algumas tabelas podem vir com sub-cabeçalhos, vamos filtrar pelo index na primeira coluna
             for row in table:
                 if not row or len(row) < 12:
                     continue
@@ -274,37 +271,32 @@ def _parse_matricula_inicial(pdf: pdfplumber.PDF, errors: list[str], *, turno: s
                 if not nome or "NOME DO ALUNO" in nome.upper():
                     continue
                 
-                # INEP ou CPF como matrícula
                 inep = (row[11] or "").strip()
                 cpf = (row[9] or "").strip().replace(".", "").replace("-", "")
-                
-                # Usamos INEP se disponível, senão CPF, senão geramos um baseado no nome
                 matricula = inep if len(inep) >= 5 else (cpf if len(cpf) >= 5 else f"SEM-{_slugify(nome)[:10]}")
                 
                 if not matricula:
                     continue
 
-                parsed_alunos.append(
-                    ParsedAlunoRecord(
-                        matricula=matricula,
-                        nome=nome,
-                        turma=file_turma,
-                        turno=file_turno,
-                        sexo=(row[2] or "").strip(),
-                        data_nascimento=(row[3] or "").strip(),
-                        naturalidade=(row[4] or "").strip(),
-                        zona=(row[5] or "").strip(),
-                        endereco=(row[6] or "").strip().replace("\n", " "),
-                        filiacao=(row[7] or "").strip().replace("\n", " "),
-                        telefones=(row[8] or "").strip(),
-                        cpf=cpf,
-                        nis=(row[10] or "").strip(),
-                        inep=inep,
-                        situacao_anterior=(row[12] or "").strip(),
-                    )
+                parsed_alunos[matricula] = ParsedAlunoRecord(
+                    matricula=matricula,
+                    nome=nome,
+                    turma=file_turma,
+                    turno=file_turno,
+                    sexo=(row[2] or "").strip(),
+                    data_nascimento=(row[3] or "").strip(),
+                    naturalidade=(row[4] or "").strip(),
+                    zona=(row[5] or "").strip(),
+                    endereco=(row[6] or "").strip().replace("\n", " "),
+                    filiacao=(row[7] or "").strip().replace("\n", " "),
+                    telefones=(row[8] or "").strip(),
+                    cpf=cpf,
+                    nis=(row[10] or "").strip(),
+                    inep=inep,
+                    situacao_anterior=(row[12] or "").strip(),
                 )
     
-    return parsed_alunos, extracted_year
+    return list(parsed_alunos.values()), extracted_year
 
 
 def _extract_student_meta(text: str) -> list[dict[str, str | None]]:
@@ -411,11 +403,17 @@ def _upsert_aluno(session: Session, record: ParsedAlunoRecord, tenant_id: int | 
     
     # 2. Try by Name as fallback (Prevents duplicates between MI and Bulletin if IDs differ)
     if aluno is None and record.nome:
-        stmt = select(Aluno).where(
-            Aluno.nome == record.nome,
-            Aluno.tenant_id == tenant_id
-        )
-        aluno = session.execute(stmt).scalar_one_or_none()
+        try:
+            stmt = select(Aluno).where(
+                Aluno.nome == record.nome,
+                Aluno.tenant_id == tenant_id
+            )
+            aluno = session.execute(stmt).scalar_one_or_none()
+        except Exception:
+             # If multiple students have the same name, we can't safely link them. 
+             # Treat as a new student to avoid merging incorrect records.
+             logger.warning(f"Ambiguous student name '{record.nome}' found during ingestion for tenant {tenant_id}. Creating new record.")
+             aluno = None
 
     if aluno is None:
         aluno = Aluno(

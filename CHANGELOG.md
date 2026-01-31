@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 
 
+
+## [1.2.1] - 2026-01-30
+
+### 🔧 Fixes & Stability
+- **📥 Ingestion Engine (Reliability)**:
+    - **Homonym Protection**: Fixed worker crash when processing students with identical names. Now automatically handles ambiguities by creating separate records.
+    - **Transaction Safety**: Added explicit session flushing during user provisioning to prevent `UniqueViolation` race conditions in background jobs.
+    - **Deduplication**: Enhanced the "Matrícula Inicial" parser to deduplicate records within the same PDF file.
+- **🛡️ Security & Auth**:
+    - **Session Recovery**: Fixed 401 Unauthorized errors for administrative accounts through hash synchronization.
+    - **RBAC**: Improved tenant resolution for super-admin profiles.
+
 ## [1.2.0] - 2026-01-30
 
 ### 🚀 Added

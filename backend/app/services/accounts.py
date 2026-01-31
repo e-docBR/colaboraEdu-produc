@@ -53,6 +53,7 @@ def ensure_aluno_user(session: Session, aluno: Aluno) -> Usuario:
         must_change_password=True,
     )
     session.add(usuario)
+    session.flush() # Ensure it's visible to subsequent queries in the same transaction
     logger.info("Usuário aluno {} criado automaticamente para o tenant {}", username, aluno.tenant_id)
     return usuario
 
