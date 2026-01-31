@@ -474,14 +474,14 @@ export const api = createApi({
       }),
       invalidatesTags: ["Comunicados"]
     }),
-    listOcorrencias: builder.query<{ id: number; aluno_id: number; tipo: string; descricao: string; resolvida: boolean; data_registro: string; aluno_nome: string; autor_nome: string }[], string | void>({
+    listOcorrencias: builder.query<{ id: number; aluno_id: number; tipo: string; descricao: string; resolvida: boolean; data_registro: string; aluno_nome: string; autor_nome: string; notificacao_status?: string; observacao_pais?: string; gravidade?: string; acao_tomada?: string }[], string | void>({
       query: (aluno_id) => ({
         url: "/ocorrencias",
         params: aluno_id ? { aluno_id } : undefined
       }),
       providesTags: ["Ocorrencias"]
     }),
-    createOcorrencia: builder.mutation<void, { aluno_id: number; tipo: string; descricao: string; data_registro?: string; resolvida?: boolean }>({
+    createOcorrencia: builder.mutation<void, { aluno_id: number; tipo: string; descricao: string; data_registro?: string; resolvida?: boolean; notificar_responsaveis?: boolean; observacao_pais?: string; gravidade?: string; acao_tomada?: string }>({
       query: (body) => ({
         url: "/ocorrencias",
         method: "POST",
@@ -489,7 +489,7 @@ export const api = createApi({
       }),
       invalidatesTags: ["Ocorrencias"]
     }),
-    updateOcorrencia: builder.mutation<void, { id: number; tipo?: string; descricao?: string; resolvida?: boolean; data_registro?: string }>({
+    updateOcorrencia: builder.mutation<void, { id: number; tipo?: string; descricao?: string; resolvida?: boolean; data_registro?: string; observacao_pais?: string; gravidade?: string; acao_tomada?: string }>({
       query: ({ id, ...body }) => ({
         url: `/ocorrencias/${id}`,
         method: "PATCH",

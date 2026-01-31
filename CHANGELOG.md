@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 
 
 
+## [1.3.0] - 2026-01-31
+
+### 🚀 Added
+- **🛡️ Professional Ocorrências System**:
+    - **Severity Classification**: Added LEVE, MÉDIA, GRAVE, and GRAVÍSSIMA levels with visual color coding.
+    - **Actions Taken**: New field to record disciplinary measures applied (e.g., Warning, Suspension).
+    - **UI Redesign**: Reorganized the registration dialog into logical sections (Identificação, Detalhes, Resolução).
+    - **Parent Instructions**: Added a dedicated field for custom instructions in notifications.
+- **📧 Automated Notifications (Enhanced)**:
+    - **Contextual Alerts**: WhatsApp and Email notifications now include the severity level of the occurrence.
+    - **Reliability**: Fixed TypeScript build errors in the frontend API layer to ensure stable production deployments.
+
 ## [1.2.1] - 2026-01-30
 
 ### 🔧 Fixes & Stability

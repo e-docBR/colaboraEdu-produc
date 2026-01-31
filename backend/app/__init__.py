@@ -22,6 +22,13 @@ def create_app() -> Flask:
         SQLALCHEMY_DATABASE_URI=settings.database_url,
         UPLOAD_FOLDER=settings.upload_folder,
         LOG_LEVEL=settings.log_level,
+        # SMTP Settings
+        MAIL_SERVER=settings.smtp_server,
+        MAIL_PORT=settings.smtp_port,
+        MAIL_USE_TLS=True,
+        MAIL_USERNAME=settings.smtp_user,
+        MAIL_PASSWORD=settings.smtp_password,
+        MAIL_DEFAULT_SENDER=settings.smtp_from
     )
 
     CORS(app, resources={r"/api/*": {"origins": settings.allowed_origins}})
@@ -29,6 +36,9 @@ def create_app() -> Flask:
     init_db(app)
     register_blueprints(app)
     register_cli(app)
+
+    from .services.communication_service import mail
+    mail.init_app(app)
     
     from .core.handlers import register_error_handlers
     register_error_handlers(app)

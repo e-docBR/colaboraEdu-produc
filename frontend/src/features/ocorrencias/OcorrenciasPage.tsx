@@ -27,7 +27,9 @@ import {
     Avatar,
     useTheme,
     Fade,
-    Pagination
+    Pagination,
+    Checkbox,
+    FormControlLabel
 } from "@mui/material";
 import { useState, useMemo } from "react";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
@@ -61,6 +63,13 @@ const TIPO_CONFIG: Record<string, { color: string, label: string, icon: React.El
     OUTRO: { color: "#6b7280", label: "Outro", icon: InfoIcon, bgcolor: "#f3f4f6" }
 };
 
+const GRAVIDADE_CONFIG: Record<string, { color: string, label: string, bgcolor: string }> = {
+    LEVE: { color: "#3b82f6", label: "Leve", bgcolor: "#dbeafe" },
+    MEDIA: { color: "#f59e0b", label: "Média", bgcolor: "#fef3c7" },
+    GRAVE: { color: "#ef4444", label: "Grave", bgcolor: "#fee2e2" },
+    GRAVISSIMA: { color: "#7f1d1d", label: "Gravíssima", bgcolor: "#fecaca" }
+};
+
 export const OcorrenciasPage = () => {
     const theme = useTheme();
     const { data: ocorrencias, isLoading } = useListOcorrenciasQuery();
@@ -77,6 +86,10 @@ export const OcorrenciasPage = () => {
     const [alunoId, setAlunoId] = useState<number | null>(null);
     const [tipo, setTipo] = useState("ADVERTENCIA");
     const [descricao, setDescricao] = useState("");
+    const [observacaoPais, setObservacaoPais] = useState("");
+    const [gravidade, setGravidade] = useState("LEVE");
+    const [acaoTomada, setAcaoTomada] = useState("");
+    const [notificarResponsaveis, setNotificarResponsaveis] = useState(false);
 
     // Menu state
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -136,7 +149,11 @@ export const OcorrenciasPage = () => {
                     aluno_id: alunoId,
                     tipo,
                     descricao,
-                    data_registro: dataRegistro
+                    observacao_pais: observacaoPais,
+                    gravidade,
+                    acao_tomada: acaoTomada,
+                    data_registro: dataRegistro,
+                    notificar_responsaveis: notificarResponsaveis
                 }).unwrap();
             }
             setOpen(false);
@@ -148,11 +165,15 @@ export const OcorrenciasPage = () => {
 
     const resetForm = () => {
         setDescricao("");
+        setObservacaoPais("");
+        setAcaoTomada("");
+        setGravidade("LEVE");
         setAlunoId(null);
         setEditingId(null);
         setTipo("ADVERTENCIA");
         setDataRegistro(new Date().toISOString().split("T")[0]);
         setFilterTurma("");
+        setNotificarResponsaveis(false);
     };
 
     const handleEdit = () => {
@@ -161,6 +182,9 @@ export const OcorrenciasPage = () => {
         setAlunoId(menuOcorrencia.aluno_id);
         setTipo(menuOcorrencia.tipo);
         setDescricao(menuOcorrencia.descricao);
+        setObservacaoPais(menuOcorrencia.observacao_pais || "");
+        setGravidade(menuOcorrencia.gravidade || "LEVE");
+        setAcaoTomada(menuOcorrencia.acao_tomada || "");
         // Ensure valid date string
         if (menuOcorrencia.data_registro) {
             setDataRegistro(menuOcorrencia.data_registro.split("T")[0]);
@@ -322,24 +346,39 @@ export const OcorrenciasPage = () => {
                                             )}
                                         </Stack>
 
-                                        <Chip
-                                            label={config.label}
-                                            size="small"
-                                            sx={{
-                                                bgcolor: config.bgcolor,
-                                                color: config.color,
-                                                fontWeight: 600,
-                                                fontSize: "0.625rem",
-                                                height: 20,
-                                                mb: 2
-                                            }}
-                                        />
+                                        <Stack direction="row" spacing={1} mb={2}>
+                                            <Chip
+                                                label={config.label}
+                                                size="small"
+                                                sx={{
+                                                    bgcolor: config.bgcolor,
+                                                    color: config.color,
+                                                    fontWeight: 600,
+                                                    fontSize: "0.625rem",
+                                                    height: 20
+                                                }}
+                                            />
+                                            {oc.gravidade && (
+                                                <Chip
+                                                    label={GRAVIDADE_CONFIG[oc.gravidade]?.label || oc.gravidade}
+                                                    size="small"
+                                                    sx={{
+                                                        bgcolor: GRAVIDADE_CONFIG[oc.gravidade]?.bgcolor || "divider",
+                                                        color: GRAVIDADE_CONFIG[oc.gravidade]?.color || "text.primary",
+                                                        fontWeight: 700,
+                                                        fontSize: "0.625rem",
+                                                        height: 20,
+                                                        textTransform: "uppercase"
+                                                    }}
+                                                />
+                                            )}
+                                        </Stack>
 
                                         <Typography
                                             variant="body1"
                                             sx={{
                                                 color: "text.primary",
-                                                mb: 3,
+                                                mb: 2,
                                                 minHeight: 48,
                                                 display: "-webkit-box",
                                                 WebkitLineClamp: 3,
@@ -352,6 +391,17 @@ export const OcorrenciasPage = () => {
                                             {oc.descricao}
                                         </Typography>
 
+                                        {oc.acao_tomada && (
+                                            <Box mb={2} p={1.5} sx={{ bgcolor: "grey.50", borderRadius: 2, borderLeft: "3px solid", borderColor: "grey.300" }}>
+                                                <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" gutterBottom>
+                                                    AÇÃO TOMADA:
+                                                </Typography>
+                                                <Typography variant="body2" color="text.primary">
+                                                    {oc.acao_tomada}
+                                                </Typography>
+                                            </Box>
+                                        )}
+
                                         <Stack direction="row" justifyContent="space-between" alignItems="center" pt={2} borderTop="1px solid" borderColor="divider">
                                             <Stack direction="row" spacing={0.5} alignItems="center" color="text.secondary">
                                                 <CalendarTodayIcon sx={{ fontSize: 14 }} />
@@ -359,6 +409,18 @@ export const OcorrenciasPage = () => {
                                                     {new Date(oc.data_registro).toLocaleDateString()}
                                                 </Typography>
                                             </Stack>
+
+                                            {oc.notificacao_status && (
+                                                <Tooltip title={`Status da Notificação: ${oc.notificacao_status}`}>
+                                                    <Chip
+                                                        label={oc.notificacao_status}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        color={oc.notificacao_status === "Enviado" ? "success" : "warning"}
+                                                        sx={{ height: 20, fontSize: "0.6rem" }}
+                                                    />
+                                                </Tooltip>
+                                            )}
 
                                             {oc.resolvida ? (
                                                 <Chip
@@ -423,77 +485,156 @@ export const OcorrenciasPage = () => {
                     {editingId ? "Editar Ocorrência" : "Nova Ocorrência"}
                 </DialogTitle>
                 <DialogContent>
-                    <Stack spacing={2} sx={{ mt: 1 }}>
-
-                        {/* Aluno Selection Filter */}
-                        <Stack direction="row" spacing={2} alignItems="center">
-                            <FormControl size="small" sx={{ minWidth: 120 }}>
-                                <InputLabel>Filtro Turma</InputLabel>
-                                <Select
-                                    value={filterTurma}
-                                    label="Filtro Turma"
-                                    onChange={(e) => setFilterTurma(e.target.value)}
-                                >
-                                    <MenuItem value="">
-                                        <em>Todas</em>
-                                    </MenuItem>
-                                    {turmas.map((t) => (
-                                        <MenuItem key={t} value={t}>{t}</MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-
-                            <Autocomplete
-                                fullWidth
-                                options={filteredAlunos}
-                                getOptionLabel={(option) => `${option.nome} (${option.turma})`}
-                                onChange={(_, value) => setAlunoId(value?.id || null)}
-                                value={alunosData?.items?.find((a) => a.id === alunoId) || null}
-                                renderInput={(params) => <TextField {...params} label="Selecione o Aluno" variant="outlined" size="small" />}
-                                disabled={!!editingId} // Disable student change on edit
-                                ListboxProps={{ style: { maxHeight: 200 } }}
-                            />
-                        </Stack>
-
-                        <Stack direction="row" spacing={2}>
-                            <TextField
-                                type="date"
-                                label="Data da Ocorrência"
-                                value={dataRegistro}
-                                onChange={(e) => setDataRegistro(e.target.value)}
-                                InputLabelProps={{ shrink: true }}
-                                fullWidth
-                                size="small"
-                            />
-
-                            <FormControl fullWidth size="small">
-                                <InputLabel>Tipo</InputLabel>
-                                <Select
-                                    value={tipo}
-                                    label="Tipo"
-                                    onChange={(e) => setTipo(e.target.value)}
-                                >
-                                    {Object.entries(TIPO_CONFIG).map(([key, config]) => (
-                                        <MenuItem key={key} value={key}>
-                                            <Box display="flex" alignItems="center" gap={1}>
-                                                <config.icon fontSize="small" sx={{ color: config.color }} />
-                                                <Typography variant="body2">{config.label}</Typography>
-                                            </Box>
+                    <Stack spacing={3} sx={{ mt: 1 }}>
+                        {/* Section 1: Identification */}
+                        <Box>
+                            <Typography variant="overline" color="text.secondary" fontWeight={700}>Identificação</Typography>
+                            <Stack direction="row" spacing={2} alignItems="center" mt={1}>
+                                <FormControl size="small" sx={{ minWidth: 120 }}>
+                                    <InputLabel>Filtro Turma</InputLabel>
+                                    <Select
+                                        value={filterTurma}
+                                        label="Filtro Turma"
+                                        onChange={(e) => setFilterTurma(e.target.value)}
+                                    >
+                                        <MenuItem value="">
+                                            <em>Todas</em>
                                         </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        </Stack>
+                                        {turmas.map((t) => (
+                                            <MenuItem key={t} value={t}>{t}</MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
 
-                        <TextField
-                            label="Descrição do Fato"
-                            fullWidth
-                            multiline
-                            rows={4}
-                            value={descricao}
-                            onChange={(e) => setDescricao(e.target.value)}
-                            placeholder="Descreva o ocorrido detalhadamente..."
-                        />
+                                <Autocomplete
+                                    fullWidth
+                                    options={filteredAlunos}
+                                    getOptionLabel={(option) => `${option.nome} (${option.turma})`}
+                                    onChange={(_, value) => setAlunoId(value?.id || null)}
+                                    value={alunosData?.items?.find((a) => a.id === alunoId) || null}
+                                    renderInput={(params) => <TextField {...params} label="Selecione o Aluno" variant="outlined" size="small" />}
+                                    disabled={!!editingId} // Disable student change on edit
+                                    ListboxProps={{ style: { maxHeight: 200 } }}
+                                />
+                            </Stack>
+                        </Box>
+
+                        <Divider />
+
+                        {/* Section 2: Details */}
+                        <Box>
+                            <Typography variant="overline" color="text.secondary" fontWeight={700}>Detalhes da Ocorrência</Typography>
+                            <Grid container spacing={2} mt={0.5}>
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <TextField
+                                        type="date"
+                                        label="Data do Fato"
+                                        value={dataRegistro}
+                                        onChange={(e) => setDataRegistro(e.target.value)}
+                                        InputLabelProps={{ shrink: true }}
+                                        fullWidth
+                                        size="small"
+                                    />
+                                </Grid>
+                                <Grid size={{ xs: 12, md: 6 }}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Tipo de Ocorrência</InputLabel>
+                                        <Select
+                                            value={tipo}
+                                            label="Tipo de Ocorrência"
+                                            onChange={(e) => setTipo(e.target.value)}
+                                        >
+                                            {Object.entries(TIPO_CONFIG).map(([key, config]) => (
+                                                <MenuItem key={key} value={key}>
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <config.icon fontSize="small" sx={{ color: config.color }} />
+                                                        <Typography variant="body2">{config.label}</Typography>
+                                                    </Box>
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid size={{ xs: 12 }}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Gravidade</InputLabel>
+                                        <Select
+                                            value={gravidade}
+                                            label="Gravidade"
+                                            onChange={(e) => setGravidade(e.target.value)}
+                                        >
+                                            {Object.entries(GRAVIDADE_CONFIG).map(([key, config]) => (
+                                                <MenuItem key={key} value={key}>
+                                                    <Box display="flex" alignItems="center" gap={1}>
+                                                        <Box sx={{ width: 12, height: 12, borderRadius: "50%", bgcolor: config.color }} />
+                                                        <Typography variant="body2" fontWeight={600}>{config.label}</Typography>
+                                                    </Box>
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid size={{ xs: 12 }}>
+                                    <TextField
+                                        label="Descrição Detalhada do Fato"
+                                        fullWidth
+                                        multiline
+                                        rows={3}
+                                        value={descricao}
+                                        onChange={(e) => setDescricao(e.target.value)}
+                                        placeholder="O que aconteceu?"
+                                    />
+                                </Grid>
+                            </Grid>
+                        </Box>
+
+                        <Divider />
+
+                        {/* Section 3: Resolution & Communication */}
+                        <Box>
+                            <Typography variant="overline" color="text.secondary" fontWeight={700}>Resolução e Comunicação</Typography>
+                            <Stack spacing={2} mt={1}>
+                                <TextField
+                                    fullWidth
+                                    label="Medida Disciplinar / Ação Tomada"
+                                    multiline
+                                    rows={2}
+                                    value={acaoTomada}
+                                    onChange={(e) => setAcaoTomada(e.target.value)}
+                                    placeholder="Ex: Advertência verbal, suspensão de 2 dias..."
+                                />
+
+                                <TextField
+                                    fullWidth
+                                    label="Instruções para os Pais (Aparece na Notificação)"
+                                    multiline
+                                    rows={2}
+                                    value={observacaoPais}
+                                    onChange={(e) => setObservacaoPais(e.target.value)}
+                                    placeholder="Ex: Favor comparecer à coordenação amanhã às 8h."
+                                />
+
+                                {!editingId && (
+                                    <Box p={1.5} sx={{ bgcolor: "error.50", borderRadius: 3, border: "1px solid", borderColor: "error.100" }}>
+                                        <FormControlLabel
+                                            control={
+                                                <Checkbox
+                                                    checked={notificarResponsaveis}
+                                                    onChange={(e) => setNotificarResponsaveis(e.target.checked)}
+                                                    color="error"
+                                                />
+                                            }
+                                            label={
+                                                <Box>
+                                                    <Typography variant="body2" fontWeight={700} color="error.dark">Notificar Responsáveis</Typography>
+                                                    <Typography variant="caption" color="text.secondary">Dispara Email e WhatsApp imediatamente</Typography>
+                                                </Box>
+                                            }
+                                        />
+                                    </Box>
+                                )}
+                            </Stack>
+                        </Box>
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ p: 3 }}>

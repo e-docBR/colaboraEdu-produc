@@ -33,7 +33,9 @@ dependencies = [
     "bcrypt==4.0.1",
     "scikit-learn>=1.5.0",
     "pandas>=2.2.0",
-    "xhtml2pdf>=0.2.16"
+    "xhtml2pdf>=0.2.16",
+    "Flask-Mail>=0.9.1",
+    "requests>=2.31.0"
 ]
 
 [project.optional-dependencies]

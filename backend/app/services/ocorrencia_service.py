@@ -27,6 +27,7 @@ class OcorrenciaService:
                 tipo=o.tipo,
                 descricao=o.descricao,
                 data_registro=o.data_registro,
+                notificacao_status=o.notificacao_status,
                 aluno_nome=o.aluno.nome if o.aluno else "Desconhecido",
                 autor_nome=o.autor.username if o.autor else "Sistema"
             ))
@@ -46,12 +47,25 @@ class OcorrenciaService:
             "autor_id": self.user_id,
             "tipo": data.tipo,
             "descricao": data.descricao,
+            "observacao_pais": data.observacao_pais,
+            "gravidade": data.gravidade,
+            "acao_tomada": data.acao_tomada,
             "data_registro": dt,
             "tenant_id": g.tenant_id,
             "academic_year_id": g.academic_year_id
         }
         
         novo = self.repository.create(payload)
+
+        # Handle notification if requested
+        if data.notificar_responsaveis:
+            from ..core.queue import queue
+            from ..core.tasks import notify_occurrence_task
+            queue.enqueue(notify_occurrence_task, novo.id)
+            # Update status to Pending
+            novo.notificacao_status = "Pendente"
+            self.repository.session.add(novo)
+            self.repository.session.commit()
 
         # Audit
         log_action(
@@ -60,7 +74,7 @@ class OcorrenciaService:
             "CREATE", 
             "Ocorrencia", 
             novo.id, 
-            {"tipo": novo.tipo, "aluno_id": novo.aluno_id}
+            {"tipo": novo.tipo, "aluno_id": novo.aluno_id, "notificado": data.notificar_responsaveis}
         )
         
         return OcorrenciaSchema(
@@ -70,6 +84,7 @@ class OcorrenciaService:
                 tipo=novo.tipo,
                 descricao=novo.descricao,
                 data_registro=novo.data_registro,
+                notificacao_status=novo.notificacao_status,
                 aluno_nome=novo.aluno.nome if novo.aluno else "Desconhecido",
                 autor_nome="Eu" # Simplified
         )
@@ -99,6 +114,7 @@ class OcorrenciaService:
                 tipo=updated.tipo,
                 descricao=updated.descricao,
                 data_registro=updated.data_registro,
+                notificacao_status=updated.notificacao_status,
                 aluno_nome=updated.aluno.nome if updated.aluno else "Desconhecido",
                 autor_nome=updated.autor.username if updated.autor else "Sistema"
         )
