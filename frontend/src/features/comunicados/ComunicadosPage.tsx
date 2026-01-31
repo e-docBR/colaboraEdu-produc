@@ -25,9 +25,10 @@ import {
     Chip,
     Avatar,
     useTheme,
-    Fade
+    Fade,
+    Autocomplete
 } from "@mui/material";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -45,7 +46,8 @@ import {
     useListComunicadosQuery,
     useUpdateComunicadoMutation,
     useDeleteComunicadoMutation,
-    useMarkComunicadoReadMutation
+    useMarkComunicadoReadMutation,
+    useListAlunosQuery
 } from "../../lib/api";
 import { useAppSelector } from "../../app/hooks";
 
@@ -73,6 +75,15 @@ export const ComunicadosPage = () => {
     const [conteudo, setConteudo] = useState("");
     const [targetType, setTargetType] = useState("TODOS");
     const [targetValue, setTargetValue] = useState("");
+
+    // For filtering turmas
+    const { data: alunosData } = useListAlunosQuery({ per_page: 1000 });
+    const turmas = useMemo(() => {
+        if (!alunosData?.items) return [];
+        // Extract unique turmas
+        const t = new Set(alunosData.items.map((a: any) => a.turma).filter(Boolean));
+        return Array.from(t).sort();
+    }, [alunosData]);
 
     // Menu state
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -379,37 +390,49 @@ export const ComunicadosPage = () => {
                             variant="outlined"
                         />
                         <FormControl fullWidth>
-                            <InputLabel>Destinatário</InputLabel>
+                            <InputLabel id="destinatario-label">Destinatário</InputLabel>
                             <Select
+                                labelId="destinatario-label"
                                 value={targetType}
                                 label="Destinatário"
-                                onChange={(e) => setTargetType(e.target.value)}
+                                onChange={(e) => {
+                                    setTargetType(e.target.value);
+                                    setTargetValue(""); // Reset value when type changes
+                                }}
                                 renderValue={(selected) => (
-                                    <Box display="flex" alignItems="center" gap={1}>
+                                    <Box display="flex" alignItems="center" gap={1.5}>
                                         {getTargetIcon(selected)}
-                                        {selected === "TODOS" ? "Todos (Escola Inteira)" : selected === "TURMA" ? "Turma Específica" : "Aluno Específico"}
+                                        <Typography fontWeight={500}>
+                                            {selected === "TODOS" ? "Todos (Escola Inteira)" : selected === "TURMA" ? "Turma Específica" : "Aluno Específico"}
+                                        </Typography>
                                     </Box>
                                 )}
                             >
                                 <MenuItem value="TODOS">
-                                    <ListItemIcon><SchoolIcon fontSize="small" /></ListItemIcon>
-                                    Todos (Escola Inteira)
+                                    <ListItemIcon><SchoolIcon fontSize="small" sx={{ color: "primary.main" }} /></ListItemIcon>
+                                    <Typography variant="body2">Todos (Escola Inteira)</Typography>
                                 </MenuItem>
                                 <MenuItem value="TURMA">
-                                    <ListItemIcon><GroupsIcon fontSize="small" /></ListItemIcon>
-                                    Turma Específica
+                                    <ListItemIcon><GroupsIcon fontSize="small" sx={{ color: "secondary.main" }} /></ListItemIcon>
+                                    <Typography variant="body2">Turma Específica</Typography>
                                 </MenuItem>
                             </Select>
                         </FormControl>
 
+                        {/* Dynamic Target Value Input */}
                         {targetType === "TURMA" && (
-                            <TextField
-                                label="Nome da Turma"
-                                fullWidth
+                            <Autocomplete
+                                options={turmas}
                                 value={targetValue}
-                                onChange={(e) => setTargetValue(e.target.value)}
-                                placeholder="Ex: 9º ANO A"
-                                helperText="Digite exatamente o nome da turma"
+                                onChange={(_, newValue) => setTargetValue(newValue || "")}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Selecione a Turma"
+                                        placeholder="Ex: 6º ANO A"
+                                        helperText="O comunicado será enviado para todos os alunos desta turma"
+                                    />
+                                )}
                             />
                         )}
 
@@ -424,19 +447,31 @@ export const ComunicadosPage = () => {
                         />
                     </Stack>
                 </DialogContent>
-                <DialogActions sx={{ p: 3 }}>
-                    <Button onClick={() => { setOpen(false); resetForm(); }} sx={{ borderRadius: 2, fontWeight: 600 }}>
+                <DialogActions sx={{ p: 3, gap: 1 }}>
+                    <Button
+                        onClick={() => { setOpen(false); resetForm(); }}
+                        sx={{
+                            borderRadius: 2,
+                            fontWeight: 600,
+                            color: "text.secondary"
+                        }}
+                    >
                         Cancelar
                     </Button>
                     <Button
                         onClick={handleSave}
                         variant="contained"
-                        disabled={isCreating}
+                        disabled={isCreating || !titulo || !conteudo}
                         sx={{
                             borderRadius: 2,
                             fontWeight: 700,
                             px: 4,
-                            background: "linear-gradient(135deg, #4f46e5 0%, #818cf8 100%)"
+                            py: 1,
+                            background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", // Indigo/Purple gradient
+                            boxShadow: "0 4px 12px rgba(79, 70, 229, 0.3)",
+                            "&:hover": {
+                                background: "linear-gradient(135deg, #4f46e5 0%, #4338ca 100%)",
+                            }
                         }}
                     >
                         {editingId ? "Salvar Alterações" : "Publicar Aviso"}

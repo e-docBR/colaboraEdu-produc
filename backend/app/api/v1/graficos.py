@@ -153,59 +153,59 @@ def _situacao_distribuicao(
     _trimestre: str | None,
     _disciplina: str | None,
 ):
-    # Conta alunos únicos por situação (não registros de notas)
-    # Agrupa situações de cada aluno e considera a PIOR situação
+    # Conta alunos únicos por situação
+    # Prioridade: Status do Aluno (Desistente, Transferido) > Status das Notas (Reprovado, Aprovado)
     
-    # Busca todas as notas com filtros aplicados
-    query = session.query(Nota.aluno_id, Nota.situacao)
+    # Busca todas as notas e o status do aluno
+    query = session.query(Nota.aluno_id, Nota.situacao, Aluno.status)
     query = query.join(Aluno, Nota.aluno_id == Aluno.id)
     query = _apply_common_filters(query, turno, serie, turma, None)
     
-    # Agrupa por aluno e determina situação
-    # Lógica: Se tiver QUALQUER reprovação/recuperação -> Recuperação
-    # Se não tiver reprovação mas tiver aprovação -> Aprovado
-    # Senão -> Outros
+    aluno_grades_status: dict[int, set[str]] = {}
+    aluno_special_status: dict[int, str] = {}
     
-    aluno_situacoes: dict[int, str] = {}
-    
-    # Mapeamento de status
     STATUS_REPROVADO = {"REP", "REC", "REPROVADO"}
-    STATUS_APROVADO = {"APR", "APROVADO", "AR", "ACC"}
+    STATUS_APROVADO = {"APR", "APROVADO", "AR", "ACC", "APCC"}
     
-    # Verifica data limite para recuperação (21/12)
-    now = datetime.now()
-    cutoff_date = datetime(now.year, 12, 21)
-    is_past_cutoff = now > cutoff_date
-
-    # Primeiro passo: coletar todos os status de cada aluno
-    aluno_status_set: dict[int, set[str]] = {}
-    
-    for aluno_id, situacao in query.all():
-        if aluno_id not in aluno_status_set:
-            aluno_status_set[aluno_id] = set()
+    for aluno_id, grade_situacao, student_status in query.all():
+        if aluno_id not in aluno_grades_status:
+            aluno_grades_status[aluno_id] = set()
         
-        if situacao:
-            aluno_status_set[aluno_id].add(situacao.upper())
+        # Capture special status if present
+        if student_status:
+            aluno_special_status[aluno_id] = student_status
             
-    # Segundo passo: determinar status final
-    for aluno_id, status_set in aluno_status_set.items():
-        # Se tem alguma reprovação
-        if not status_set.isdisjoint(STATUS_REPROVADO):
-            aluno_situacoes[aluno_id] = "Reprovado"
-        # Se não tem reprovação, mas tem aprovação
-        elif not status_set.isdisjoint(STATUS_APROVADO):
-            aluno_situacoes[aluno_id] = "Aprovado"
-        else:
-            aluno_situacoes[aluno_id] = "Outros"
+        if grade_situacao:
+            aluno_grades_status[aluno_id].add(grade_situacao.upper())
+            
+    # Determinar status final de cada aluno
+    final_counts: dict[str, int] = {}
     
-    # Conta por categoria
-    data: dict[str, int] = {}
-    for situacao in aluno_situacoes.values():
-        data[situacao] = data.get(situacao, 0) + 1
+    # Get all unique student IDs found
+    all_student_ids = set(aluno_grades_status.keys())
+    
+    for aluno_id in all_student_ids:
+        # 1. Special Status (Administrative)
+        if aluno_id in aluno_special_status:
+            status = aluno_special_status[aluno_id]
+            # Normalize common terms if needed, or keep as is
+            final_counts[status] = final_counts.get(status, 0) + 1
+            continue
+            
+        # 2. Grade-based Status (Academic)
+        status_set = aluno_grades_status[aluno_id]
+        label = "Outros"
+        
+        if not status_set.isdisjoint(STATUS_REPROVADO):
+            label = "Reprovado" # or Recuperação
+        elif not status_set.isdisjoint(STATUS_APROVADO):
+            label = "Aprovado"
+            
+        final_counts[label] = final_counts.get(label, 0) + 1
     
     return [
         {"situacao": label, "total": quantidade}
-        for label, quantidade in sorted(data.items())
+        for label, quantidade in sorted(final_counts.items())
     ]
 
 

@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from sqlalchemy import select, desc, or_
 
@@ -72,7 +72,9 @@ def register(parent: Blueprint) -> None:
                 conteudo=data["conteudo"],
                 autor_id=user_id,
                 target_type=data.get("target_type", "TODOS"),
-                target_value=data.get("target_value")
+                target_value=data.get("target_value"),
+                tenant_id=g.tenant_id,
+                academic_year_id=g.academic_year_id
             )
             session.add(novo)
         

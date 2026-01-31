@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## [1.2.0] - 2026-01-30
+
+### 🚀 Added
+- **📧 Aluno Enhancements**:
+    - **Contacts**: Added fields for `Email` and `Telefone` with input masks to the Student Registration form.
+    - **Backend Support**: Updated `Aluno` model and schemas to persist contact information.
+- **📋 Listagem de Turmas (Optimized)**:
+    - **Fixed Counts**: Turma cards now correctly aggregate students regardless of inconsistent "Turno" data (Explicit `LEFT JOIN` fixes).
+    - **Performance**: Optimized SQL query for sorting and grouping by Turma name.
+- **📊 Analytics & Charts**:
+    - **Status Intelligence**: The "Situation Distribution" chart now prioritizes administrative statuses (**Desistente**, **Transferido**) over academic grades.
+    - **Dashboards**: Real-time integration of special statues into global KPI calculations.
+- **📢 Comunicados Fixes**:
+    - **Security**: Fixed `tenant_id` injection bug preventing formatting of new announcements.
+    - **UX**: Added Autocomplete for Turma selection in "Novo Comunicado".
+
 ## [1.1.0] - 2026-01-27
 
 ### 🚀 Added

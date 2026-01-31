@@ -15,18 +15,23 @@ class TurmaRepository(BaseRepository[Aluno]):
 
     def get_summaries(self) -> List[Tuple[str, str, int, float, float]]:
         from flask import g
+        from loguru import logger
+        
         tenant_id = getattr(g, "tenant_id", None)
         academic_year_id = getattr(g, "academic_year_id", None)
+
+        logger.info(f"get_summaries V2 EXPLICIT JOIN tenant={tenant_id} year={academic_year_id}")
 
         query = (
             self.session.query(
                 Aluno.turma,
-                Aluno.turno,
+                func.max(Aluno.turno).label("turno"),
                 func.count(distinct(Aluno.id)).label("total_alunos"),
                 func.avg(Nota.total).label("media"),
                 func.avg(Nota.faltas).label("faltas_medias"),
             )
-            .outerjoin(Nota)
+            .select_from(Aluno)
+            .outerjoin(Nota, Aluno.id == Nota.aluno_id)
         )
 
         if tenant_id:
@@ -34,8 +39,11 @@ class TurmaRepository(BaseRepository[Aluno]):
         if academic_year_id:
             query = query.filter(Aluno.academic_year_id == academic_year_id)
 
-        query = query.group_by(Aluno.turma, Aluno.turno).order_by(Aluno.turma)
-        return query.all()
+        query = query.group_by(Aluno.turma).order_by(Aluno.turma)
+        
+        results = query.all()
+        logger.info(f"get_summaries V2 found {len(results)} turmas")
+        return results
 
     def get_real_name(self, name_or_slug: str, slugify_func) -> Optional[str]:
         from flask import g

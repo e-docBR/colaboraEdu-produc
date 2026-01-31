@@ -89,6 +89,7 @@ class TurmaService:
                     turno=aluno.turno,
                     media=media_total,
                     situacao=situacao,
+                    status=aluno.status,
                     notas=notas_schema
                 )
             )

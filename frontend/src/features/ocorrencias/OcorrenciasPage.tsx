@@ -29,7 +29,7 @@ import {
     Fade,
     Pagination
 } from "@mui/material";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -84,6 +84,23 @@ export const OcorrenciasPage = () => {
 
     const [searchTerm, setSearchTerm] = useState("");
 
+    const [dataRegistro, setDataRegistro] = useState(new Date().toISOString().split("T")[0]);
+    const [filterTurma, setFilterTurma] = useState<string>("");
+
+    const turmas = useMemo(() => {
+        if (!alunosData?.items) return [];
+        const t = new Set(alunosData.items.map((a) => a.turma).filter(Boolean));
+        return Array.from(t).sort();
+    }, [alunosData]);
+
+    const filteredAlunos = useMemo(() => {
+        let items = alunosData?.items || [];
+        if (filterTurma) {
+            items = items.filter((a) => a.turma === filterTurma);
+        }
+        return items;
+    }, [alunosData, filterTurma]);
+
     const handleOpenMenu = (event: React.MouseEvent<HTMLElement>, ocorrencia: any) => {
         setAnchorEl(event.currentTarget);
         setMenuOcorrencia(ocorrencia);
@@ -111,14 +128,15 @@ export const OcorrenciasPage = () => {
                 await updateOcorrencia({
                     id: editingId,
                     tipo,
-                    descricao
+                    descricao,
+                    data_registro: dataRegistro
                 }).unwrap();
             } else {
                 await createOcorrencia({
                     aluno_id: alunoId,
                     tipo,
                     descricao,
-                    data_registro: new Date().toISOString()
+                    data_registro: dataRegistro
                 }).unwrap();
             }
             setOpen(false);
@@ -133,6 +151,8 @@ export const OcorrenciasPage = () => {
         setAlunoId(null);
         setEditingId(null);
         setTipo("ADVERTENCIA");
+        setDataRegistro(new Date().toISOString().split("T")[0]);
+        setFilterTurma("");
     };
 
     const handleEdit = () => {
@@ -141,6 +161,10 @@ export const OcorrenciasPage = () => {
         setAlunoId(menuOcorrencia.aluno_id);
         setTipo(menuOcorrencia.tipo);
         setDescricao(menuOcorrencia.descricao);
+        // Ensure valid date string
+        if (menuOcorrencia.data_registro) {
+            setDataRegistro(menuOcorrencia.data_registro.split("T")[0]);
+        }
         setOpen(true);
         handleCloseMenu();
     };
@@ -399,43 +423,68 @@ export const OcorrenciasPage = () => {
                     {editingId ? "Editar Ocorrência" : "Nova Ocorrência"}
                 </DialogTitle>
                 <DialogContent>
-                    <Stack spacing={3} sx={{ mt: 1 }}>
-                        <Autocomplete
-                            options={alunosData?.items || []}
-                            getOptionLabel={(option) => `${option.nome} (${option.turma})`}
-                            onChange={(_, value) => setAlunoId(value?.id || null)}
-                            value={alunosData?.items?.find((a) => a.id === alunoId) || null}
-                            renderInput={(params) => <TextField {...params} label="Selecione o Aluno" variant="outlined" />}
-                            disabled={!!editingId} // Disable student change on edit
-                            ListboxProps={{ style: { maxHeight: 200 } }}
-                        />
-                        <FormControl fullWidth>
-                            <InputLabel>Tipo de Ocorrência</InputLabel>
-                            <Select
-                                value={tipo}
-                                label="Tipo de Ocorrência"
-                                onChange={(e) => setTipo(e.target.value)}
-                                renderValue={(selected) => {
-                                    const config = TIPO_CONFIG[selected];
-                                    const Icon = config?.icon;
-                                    return (
-                                        <Box display="flex" alignItems="center" gap={1}>
-                                            {Icon && <Icon fontSize="small" sx={{ color: config.color }} />}
-                                            {config?.label}
-                                        </Box>
-                                    );
-                                }}
-                            >
-                                {Object.entries(TIPO_CONFIG).map(([key, config]) => (
-                                    <MenuItem key={key} value={key}>
-                                        <ListItemIcon>
-                                            <config.icon fontSize="small" sx={{ color: config.color }} />
-                                        </ListItemIcon>
-                                        <Typography variant="body2" fontWeight={500}>{config.label}</Typography>
+                    <Stack spacing={2} sx={{ mt: 1 }}>
+
+                        {/* Aluno Selection Filter */}
+                        <Stack direction="row" spacing={2} alignItems="center">
+                            <FormControl size="small" sx={{ minWidth: 120 }}>
+                                <InputLabel>Filtro Turma</InputLabel>
+                                <Select
+                                    value={filterTurma}
+                                    label="Filtro Turma"
+                                    onChange={(e) => setFilterTurma(e.target.value)}
+                                >
+                                    <MenuItem value="">
+                                        <em>Todas</em>
                                     </MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
+                                    {turmas.map((t) => (
+                                        <MenuItem key={t} value={t}>{t}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+
+                            <Autocomplete
+                                fullWidth
+                                options={filteredAlunos}
+                                getOptionLabel={(option) => `${option.nome} (${option.turma})`}
+                                onChange={(_, value) => setAlunoId(value?.id || null)}
+                                value={alunosData?.items?.find((a) => a.id === alunoId) || null}
+                                renderInput={(params) => <TextField {...params} label="Selecione o Aluno" variant="outlined" size="small" />}
+                                disabled={!!editingId} // Disable student change on edit
+                                ListboxProps={{ style: { maxHeight: 200 } }}
+                            />
+                        </Stack>
+
+                        <Stack direction="row" spacing={2}>
+                            <TextField
+                                type="date"
+                                label="Data da Ocorrência"
+                                value={dataRegistro}
+                                onChange={(e) => setDataRegistro(e.target.value)}
+                                InputLabelProps={{ shrink: true }}
+                                fullWidth
+                                size="small"
+                            />
+
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Tipo</InputLabel>
+                                <Select
+                                    value={tipo}
+                                    label="Tipo"
+                                    onChange={(e) => setTipo(e.target.value)}
+                                >
+                                    {Object.entries(TIPO_CONFIG).map(([key, config]) => (
+                                        <MenuItem key={key} value={key}>
+                                            <Box display="flex" alignItems="center" gap={1}>
+                                                <config.icon fontSize="small" sx={{ color: config.color }} />
+                                                <Typography variant="body2">{config.label}</Typography>
+                                            </Box>
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Stack>
+
                         <TextField
                             label="Descrição do Fato"
                             fullWidth

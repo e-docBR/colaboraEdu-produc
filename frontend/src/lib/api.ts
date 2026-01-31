@@ -489,7 +489,7 @@ export const api = createApi({
       }),
       invalidatesTags: ["Ocorrencias"]
     }),
-    updateOcorrencia: builder.mutation<void, { id: number; tipo?: string; descricao?: string; resolvida?: boolean }>({
+    updateOcorrencia: builder.mutation<void, { id: number; tipo?: string; descricao?: string; resolvida?: boolean; data_registro?: string }>({
       query: ({ id, ...body }) => ({
         url: `/ocorrencias/${id}`,
         method: "PATCH",
