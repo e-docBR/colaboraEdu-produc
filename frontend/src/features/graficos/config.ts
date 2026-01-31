@@ -83,8 +83,7 @@ export const CHARTS: ChartDefinition[] = [
     type: "heatmap",
     supportsTurno: true,
     supportsTurma: true,
-    supportsTrimestre: true,
-    maxItems: 50
+    supportsTrimestre: true
   },
   {
     slug: "gauss-escola",

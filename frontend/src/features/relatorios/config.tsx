@@ -36,6 +36,13 @@ export type RelatorioColumn = {
   render: (row: Record<string, unknown>) => ReactNode;
 };
 
+export type RelatorioFilters = {
+  turno?: boolean;
+  serie?: boolean;
+  turma?: boolean;
+  disciplina?: boolean;
+};
+
 export type RelatorioDefinition = {
   slug: RelatorioSlug;
   title: string;
@@ -45,6 +52,7 @@ export type RelatorioDefinition = {
   icon: ElementType;
   span?: 1 | 2 | 3;
   variant: "primary" | "secondary" | "success" | "warning" | "danger" | "info";
+  filters?: RelatorioFilters;
 };
 
 const asNumber = (value: unknown, digits = 1) => {
@@ -65,6 +73,7 @@ export const RELATORIOS: RelatorioDefinition[] = [
     icon: Groups,
     span: 1,
     variant: "danger",
+    filters: { turno: true, serie: true, disciplina: true },
     columns: [
       { key: "turma", label: "Turma", render: (row) => row.turma as ReactNode },
       {
@@ -78,11 +87,12 @@ export const RELATORIOS: RelatorioDefinition[] = [
   {
     slug: "alunos-em-risco",
     title: "Alunos em Risco",
-    description: "Estudantes com média global inferior a nota de corte.",
+    description: "Estudantes com média global inferior a 50.0.",
     type: "table",
     icon: TrendingDown,
     span: 1,
     variant: "warning",
+    filters: { turno: true, serie: true, turma: true, disciplina: true },
     columns: [
       { key: "nome", label: "Aluno", render: (row) => row.nome as ReactNode },
       { key: "turma", label: "Turma", render: (row) => row.turma as ReactNode },
@@ -91,6 +101,12 @@ export const RELATORIOS: RelatorioDefinition[] = [
         label: "Média",
         align: "right",
         render: (row) => asNumber(row.media, 1),
+      },
+      {
+        key: "faltas",
+        label: "Faltas",
+        align: "right",
+        render: (row) => row.faltas as ReactNode,
       },
     ],
   },
@@ -102,6 +118,7 @@ export const RELATORIOS: RelatorioDefinition[] = [
     icon: AssignmentLate,
     span: 1,
     variant: "warning",
+    filters: { turno: true, serie: true, turma: true },
     columns: [
       { key: "disciplina", label: "Disciplina", render: (row) => row.disciplina as ReactNode },
       {
@@ -120,6 +137,7 @@ export const RELATORIOS: RelatorioDefinition[] = [
     icon: Assessment,
     span: 2,
     variant: "primary",
+    filters: { turno: true, serie: true, disciplina: true },
     columns: [
       { key: "turma", label: "Turma", render: (row) => row.turma as ReactNode },
       { key: "turno", label: "Turno", render: (row) => row.turno as ReactNode },
@@ -139,6 +157,7 @@ export const RELATORIOS: RelatorioDefinition[] = [
     icon: EmojiEvents,
     span: 1,
     variant: "success",
+    filters: { turno: true, serie: true, turma: true, disciplina: true },
     columns: [
       { key: "nome", label: "Aluno", render: (row) => row.nome as ReactNode },
       { key: "turma", label: "Turma", render: (row) => row.turma as ReactNode },
@@ -159,6 +178,7 @@ export const RELATORIOS: RelatorioDefinition[] = [
     icon: GridOn,
     span: 1,
     variant: "info",
+    filters: { turno: true, serie: true, turma: true, disciplina: true },
     columns: [], // Visual only
   },
   {
@@ -169,6 +189,7 @@ export const RELATORIOS: RelatorioDefinition[] = [
     icon: ScatterPlot,
     span: 1,
     variant: "secondary",
+    filters: { turno: true, serie: true, turma: true, disciplina: true },
     columns: [],
   },
   {
@@ -179,41 +200,62 @@ export const RELATORIOS: RelatorioDefinition[] = [
     icon: Radar,
     span: 1,
     variant: "primary",
+    filters: { turno: true, serie: true, disciplina: true },
     columns: [],
   },
   {
     slug: "radar-abandono",
     title: "Radar de Abandono",
-    description: "PREDITIVO: Alunos com alto risco de evasão (Faltas + Queda de Notas).",
+    description: "PREDITIVO: Alunos com alto risco de evasão (Nota < 50 + Faltas > 15).",
     type: "table",
     icon: WarningAmber,
     span: 1,
     variant: "danger",
+    filters: { turno: true, serie: true, turma: true, disciplina: true },
     columns: [
       { key: "nome", label: "Aluno", render: (row) => row.nome as ReactNode },
-      { key: "risco", label: "Probabilidade", align: "right", render: (row) => <span style={{ color: "#ef4444", fontWeight: "bold" }} > {(row.risco as number ?? 0) * 100}% </span> },
+      { key: "turma", label: "Turma", render: (row) => row.turma as ReactNode },
+      { key: "media", label: "Média", align: "right", render: (row) => asNumber(row.media, 1) },
+      { key: "faltas", label: "Faltas", align: "right", render: (row) => row.faltas as ReactNode },
+      { key: "risco", label: "Risco", align: "right", render: (row) => <span style={{ color: "#ef4444", fontWeight: "bold" }} > {(row.risco as number ?? 0) * 100}% </span> },
     ],
   },
   {
     slug: "comparativo-eficiencia",
     title: "Eficiência Docente",
     description: "DIAGNÓSTICO: Disparidade entre média da turma vs média da escola.",
-    type: "bar", // We will handle this specially in DetailPage
+    type: "bar",
     icon: School,
     span: 2,
     variant: "info",
-    columns: [],
+    filters: { turno: true, serie: true, disciplina: true },
+    columns: [
+      { key: "turma", label: "Turma", render: (row) => row.turma as ReactNode },
+      { key: "media", label: "Média", align: "right", render: (row) => asNumber(row.media, 1) },
+      {
+        key: "delta",
+        label: "Diferença",
+        align: "right",
+        render: (row) => {
+          const delta = row.delta as number ?? 0;
+          const color = delta >= 0 ? "#10b981" : "#ef4444";
+          return <span style={{ color, fontWeight: "bold" }}> {(delta >= 0 ? "+" : "") + delta.toFixed(1)} </span>;
+        }
+      },
+    ],
   },
   {
     slug: "top-movers",
     title: "Top Movers (Tendência)",
-    description: "Alunos com maior crescimento ou queda súbita no período.",
+    description: "Alunos com maior variação absoluta (T2 - T1).",
     type: "table",
-    icon: TrendingUp, // or TrendingDown depending on logic, let's use Up
+    icon: TrendingUp,
     span: 1,
     variant: "success",
+    filters: { turno: true, serie: true, turma: true, disciplina: true },
     columns: [
       { key: "nome", label: "Aluno", render: (row) => row.nome as ReactNode },
+      { key: "turma", label: "Turma", render: (row) => row.turma as ReactNode },
       {
         key: "delta",
         label: "Variação",
@@ -221,8 +263,7 @@ export const RELATORIOS: RelatorioDefinition[] = [
         render: (row) => {
           const delta = row.delta as number ?? 0;
           const color = delta > 0 ? "#10b981" : "#ef4444";
-          return <span style={{ color, fontWeight: "bold" }}> {delta > 0 ? "+" : ""
-          }{delta.toFixed(1)} </span>;
+          return <span style={{ color, fontWeight: "bold" }}> {delta > 0 ? "+" : ""}{delta.toFixed(1)} </span>;
         }
       },
     ],

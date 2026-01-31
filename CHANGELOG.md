@@ -12,9 +12,16 @@ All notable changes to this project will be documented in this file.
     - **Actions Taken**: New field to record disciplinary measures applied (e.g., Warning, Suspension).
     - **UI Redesign**: Reorganized the registration dialog into logical sections (Identificação, Detalhes, Resolução).
     - **Parent Instructions**: Added a dedicated field for custom instructions in notifications.
-- **📧 Automated Notifications (Enhanced)**:
-    - **Contextual Alerts**: WhatsApp and Email notifications now include the severity level of the occurrence.
-    - **Reliability**: Fixed TypeScript build errors in the frontend API layer to ensure stable production deployments.
+- **📊 Enhanced Visual Analytics**:
+    - **New Graphics**: Implemented "Curva de Gauss (Distribuição)", "Correlação: Freq. vs Notas", and "Evolução Comparativa de Turnos" in the backend.
+    - **Heatmap Improvements**: Fixed truncation issue by removing the 50-item limit, ensuring all classes are visible.
+- **📑 Dynamic Report Filters & Summaries**:
+    - **Context-Aware Filters**: Introduced dynamic filters for Turno, Série, Turma, and Disciplina based on report metadata.
+    - **Summary KPIs**: Added real-time calculation of key metrics (e.g., Alunos em Risco, Média Geral) for reports.
+- **🐛 Critical Bug Fixes**:
+    - **System Stability**: Fixed a `NameError` in `graficos.py` that caused backend crashes and service disruption.
+    - **Login Flow**: Resolved an issue where login options (school units) were missing due to backend downtime.
+    - **Build Process**: Fixed TypeScript type errors in the frontend API layer to enable production builds.
 - **🏫 Turma Standardization**:
     - **Uniform Naming**: Standardized all class names to the `Xº LETRA` format (e.g., "6º A", "7º D").
     - **EJA Support**: Implemented special handling for "Noturno" shift, normalizing grades to EJA cycles (e.g., "7º H" -> "6/7 H", "9º G" -> "8/9 G").
@@ -22,6 +29,11 @@ All notable changes to this project will be documented in this file.
     - **Auto-Normalization**: Ingestion service now automatically formats class names during PDF uploads to prevent future inconsistencies.
 - **🐛 Bug Fixes**:
     - **Student Counts**: Resolved an issue where the "Turmas" dashboard displayed incorrect student counts (filtering out students without grades) due to an implicit database join filter.
+- **📊 Reports & Analytics (Overhaul)**:
+    - **New Institutional Reports**: Added "Radar de Abandono", "Eficiência Docente", and "Top Movers" for actionable pedagogical insights.
+    - **Dynamic Resumos**: Integrated high-level KPI cards at the top of every report detail view.
+    - **Acuracy Tuning**: Adjusted "Alunos em Risco" threshold to 50.0 and merged attendance data into performance views.
+    - **Refined Viz**: Enhanced Heatmaps, Radars, and Scatters with dynamic scaling and normalized data.
 
 ## [1.2.1] - 2026-01-30
 

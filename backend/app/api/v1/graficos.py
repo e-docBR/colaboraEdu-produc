@@ -291,6 +291,98 @@ def _medias_por_trimestre(
     return resultados
 
 
+def _gauss_escola(
+    session: Session,
+    turno: str | None,
+    serie: str | None,
+    turma: str | None,
+    trimestre: str | None,
+    disciplina: str | None,
+):
+    column = _resolve_trimestre_column(trimestre)
+    query = session.query(column)
+    query = query.join(Aluno)
+    query = _apply_common_filters(query, turno, serie, turma, disciplina)
+    
+    notas = [n[0] for n in query.all() if n[0] is not None]
+    
+    # Distribuição em faixas de 0 a 100
+    faixas = [
+        {"faixa": f"{i}-{i+10}", "alunos": 0}
+        for i in range(0, 100, 10)
+    ]
+    
+    for nota in notas:
+        idx = min(int(nota // 10), 9)
+        faixas[idx]["alunos"] += 1
+        
+    return faixas
+
+
+def _correlacao_frequencia(
+    session: Session,
+    turno: str | None,
+    serie: str | None,
+    turma: str | None,
+    _trimestre: str | None,
+    disciplina: str | None,
+):
+    # Correlação entre média global (ou da disciplina) e presença
+    query = session.query(
+        Aluno.id,
+        func.avg(Nota.total).label("media"),
+        func.avg(Nota.faltas).label("faltas")
+    )
+    query = query.join(Nota)
+    query = _apply_common_filters(query, turno, serie, turma, disciplina)
+    query = query.group_by(Aluno.id)
+    
+    results = []
+    for _, media, faltas in query.all():
+        # Cálculo simples de frequência: 100% - (faltas / 20 * 100)
+        # Assumindo 20 dias letivos por disciplina/mês ou algo similar para visualização
+        freq = max(0, 100 - (float(faltas or 0) * 2)) 
+        results.append({
+            "media": round(float(media or 0), 1),
+            "frequencia": round(freq, 1)
+        })
+    return results
+
+
+def _evolucao_turnos(
+    session: Session,
+    _turno: str | None,
+    serie: str | None,
+    _turma: str | None,
+    _trimestre: str | None,
+    disciplina: str | None,
+):
+    # Comparativo Matutino vs Vespertino ao longo dos trimestres
+    periodos = ["1º", "2º", "3º"]
+    results = []
+    
+    for i, trimestre_label in enumerate(periodos):
+        col = TRIMESTRE_COLUMNS[str(i+1)]
+        
+        # Matutino
+        q_mat = session.query(func.avg(col)).join(Aluno).filter(Aluno.turno == "Matutino")
+        q_mat = _apply_common_filters(q_mat, None, serie, None, disciplina)
+        m_mat = q_mat.scalar() or 0
+        
+        # Vespertino
+        q_vesp = session.query(func.avg(col)).join(Aluno).filter(Aluno.turno == "Vespertino")
+        q_vesp = _apply_common_filters(q_vesp, None, serie, None, disciplina)
+        m_vesp = q_vesp.scalar() or 0
+        
+        results.append({
+            "periodo": trimestre_label,
+            "matutino": round(float(m_mat), 1),
+            "vespertino": round(float(m_vesp), 1)
+        })
+        
+    return results
+
+
 GRAPH_BUILDERS: dict[str, GraphBuilder] = {
     "disciplinas-medias": _disciplinas_medias,
     "turmas-trimestre": _turmas_trimestre,
@@ -298,4 +390,7 @@ GRAPH_BUILDERS: dict[str, GraphBuilder] = {
     "faltas-por-turma": _faltas_por_turma,
     "heatmap-disciplinas": _heatmap_disciplinas,
     "medias-por-trimestre": _medias_por_trimestre,
+    "gauss-escola": _gauss_escola,
+    "correlacao-frequencia": _correlacao_frequencia,
+    "evolucao-turnos": _evolucao_turnos,
 }

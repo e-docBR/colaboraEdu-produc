@@ -18,7 +18,8 @@ import {
   TableHead,
   TableRow,
   TextField,
-  Typography
+  Typography,
+  useTheme
 } from "@mui/material";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 
@@ -41,6 +42,7 @@ import {
   Legend,
   BarChart,
   Bar,
+  Cell,
   CartesianGrid
 } from "recharts";
 
@@ -58,8 +60,12 @@ export const RelatorioDetailPage = () => {
   const { slug } = useParams<{ slug: RelatorioSlug }>();
   const definition = slug ? RELATORIOS_BY_SLUG[slug] : undefined;
   const [filters, setFilters] = useState({ ...DEFAULT_FILTERS });
-  const enableAdvancedFilters = definition?.slug === "melhores-alunos";
-  const shouldFetchFilters = Boolean(enableAdvancedFilters);
+  const hasAnyFilter = useMemo(() => {
+    if (!definition?.filters) return false;
+    return Object.values(definition.filters).some(v => !!v);
+  }, [definition]);
+
+  const shouldFetchFilters = Boolean(hasAnyFilter);
   const { data: turmasData } = useListTurmasQuery(undefined, {
     skip: !shouldFetchFilters
   });
@@ -74,7 +80,7 @@ export const RelatorioDetailPage = () => {
   const turmasList = useMemo(() => turmasData?.items ?? [], [turmasData]);
 
   const turnoOptions = useMemo(() => {
-    if (!enableAdvancedFilters) return [];
+    if (!definition?.filters?.turno) return [];
     const set = new Set<string>();
     turmasList.forEach((item) => {
       if (item.turno) {
@@ -82,10 +88,10 @@ export const RelatorioDetailPage = () => {
       }
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [enableAdvancedFilters, turmasList]);
+  }, [definition?.filters?.turno, turmasList]);
 
   const serieOptions = useMemo(() => {
-    if (!enableAdvancedFilters) return [];
+    if (!definition?.filters?.serie) return [];
     const set = new Set<string>();
     turmasList.forEach((item) => {
       const serie = deriveSerieFromTurma(item.turma);
@@ -94,10 +100,10 @@ export const RelatorioDetailPage = () => {
       }
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [enableAdvancedFilters, turmasList]);
+  }, [definition?.filters?.serie, turmasList]);
 
   const turmaOptions = useMemo(() => {
-    if (!enableAdvancedFilters) return [];
+    if (!definition?.filters?.turma) return [];
     const filtered = turmasList.filter((item) => {
       const matchesTurno = !filters.turno || item.turno === filters.turno;
       const matchesSerie = !filters.serie || deriveSerieFromTurma(item.turma) === filters.serie;
@@ -105,20 +111,20 @@ export const RelatorioDetailPage = () => {
     });
     const set = new Set(filtered.map((item) => item.turma));
     return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [enableAdvancedFilters, filters.serie, filters.turno, turmasList]);
+  }, [definition?.filters?.turma, filters.serie, filters.turno, turmasList]);
 
   useEffect(() => {
-    if (!enableAdvancedFilters || !filters.turma) return;
+    if (!definition?.filters?.turma || !filters.turma) return;
     if (!turmaOptions.includes(filters.turma)) {
       setFilters((prev) => ({ ...prev, turma: "" }));
     }
-  }, [enableAdvancedFilters, filters.turma, turmaOptions]);
+  }, [definition?.filters?.turma, filters.turma, turmaOptions]);
 
   const disciplinaOptions = useMemo(() => {
-    if (!enableAdvancedFilters) return [];
+    if (!definition?.filters?.disciplina) return [];
     const disciplinas = notasFiltrosData?.disciplinas ?? [];
     return [...disciplinas].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  }, [enableAdvancedFilters, notasFiltrosData]);
+  }, [definition?.filters?.disciplina, notasFiltrosData]);
 
   const sanitizedFilters = useMemo(
     () => ({
@@ -148,7 +154,7 @@ export const RelatorioDetailPage = () => {
   const hasRows = rows.length > 0;
 
   const combinationIssues = useMemo(() => {
-    if (!enableAdvancedFilters) return [];
+    if (!hasAnyFilter) return [];
     const issues: string[] = [];
     if (filters.turma) {
       if (filters.serie && !filters.turma.toUpperCase().startsWith(filters.serie.toUpperCase())) {
@@ -160,7 +166,7 @@ export const RelatorioDetailPage = () => {
       }
     }
     return issues;
-  }, [enableAdvancedFilters, filters.serie, filters.turma, filters.turno, turmasList]);
+  }, [hasAnyFilter, filters.serie, filters.turma, filters.turno, turmasList]);
 
   if (!definition) {
     return <Alert severity="warning">Relatório não encontrado.</Alert>;
@@ -227,68 +233,80 @@ export const RelatorioDetailPage = () => {
         </CardContent>
       </Card>
 
-      {enableAdvancedFilters && (
+      {data?.summary && (
+        <ReportSummaryCards summary={data.summary} />
+      )}
+
+      {hasAnyFilter && (
         <Card>
           <CardContent>
             <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "flex-end" }}>
-              <TextField
-                select
-                label="Turno"
-                value={filters.turno}
-                onChange={handleFilterChange("turno")}
-                fullWidth
-              >
-                <MenuItem value="">Todos os turnos</MenuItem>
-                {turnoOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                label="Série"
-                value={filters.serie}
-                onChange={handleFilterChange("serie")}
-                fullWidth
-              >
-                <MenuItem value="">Todas as séries</MenuItem>
-                {serieOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                label="Turma"
-                value={filters.turma}
-                onChange={handleFilterChange("turma")}
-                disabled={turmaOptions.length === 0}
-                fullWidth
-              >
-                <MenuItem value="">Todas as turmas</MenuItem>
-                {turmaOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <TextField
-                select
-                label="Disciplina"
-                value={filters.disciplina}
-                onChange={handleFilterChange("disciplina")}
-                disabled={disciplinaOptions.length === 0}
-                fullWidth
-              >
-                <MenuItem value="">Todas as disciplinas</MenuItem>
-                {disciplinaOptions.map((option) => (
-                  <MenuItem key={option} value={option}>
-                    {option}
-                  </MenuItem>
-                ))}
-              </TextField>
+              {definition.filters?.turno && (
+                <TextField
+                  select
+                  label="Turno"
+                  value={filters.turno}
+                  onChange={handleFilterChange("turno")}
+                  fullWidth
+                >
+                  <MenuItem value="">Todos os turnos</MenuItem>
+                  {turnoOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              {definition.filters?.serie && (
+                <TextField
+                  select
+                  label="Série"
+                  value={filters.serie}
+                  onChange={handleFilterChange("serie")}
+                  fullWidth
+                >
+                  <MenuItem value="">Todas as séries</MenuItem>
+                  {serieOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              {definition.filters?.turma && (
+                <TextField
+                  select
+                  label="Turma"
+                  value={filters.turma}
+                  onChange={handleFilterChange("turma")}
+                  disabled={turmaOptions.length === 0}
+                  fullWidth
+                >
+                  <MenuItem value="">Todas as turmas</MenuItem>
+                  {turmaOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              {definition.filters?.disciplina && (
+                <TextField
+                  select
+                  label="Disciplina"
+                  value={filters.disciplina}
+                  onChange={handleFilterChange("disciplina")}
+                  disabled={disciplinaOptions.length === 0}
+                  fullWidth
+                >
+                  <MenuItem value="">Todas as disciplinas</MenuItem>
+                  {disciplinaOptions.map((option) => (
+                    <MenuItem key={option} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
             </Stack>
             {combinationIssues.length > 0 && (
               <Box mt={2}>
@@ -358,7 +376,26 @@ export const RelatorioDetailPage = () => {
   );
 };
 
-// --- Visualization Components ---
+const ReportSummaryCards = ({ summary }: { summary: any }) => {
+  const items = [summary.main, summary.secondary].filter(Boolean);
+
+  return (
+    <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+      {items.map((item, idx) => (
+        <Card key={idx} sx={{ flex: 1, borderLeft: 6, borderColor: `${item.color || "primary"}.main` }}>
+          <CardContent>
+            <Typography variant="overline" color="text.secondary" fontWeight="bold">
+              {item.label}
+            </Typography>
+            <Typography variant="h4" fontWeight="bold">
+              {item.value}
+            </Typography>
+          </CardContent>
+        </Card>
+      ))}
+    </Stack>
+  );
+};
 
 
 const HeatmapVisual = ({ data }: { data: any[] }) => {
@@ -390,10 +427,10 @@ const HeatmapVisual = ({ data }: { data: any[] }) => {
   const renderShape = (props: any) => {
     const { cx, cy, payload } = props;
     const size = 30;
-    // Color scale: Red < 60, Yellow < 80, Green >= 80
+    // Color scale: Red < 50, Yellow < 70, Green >= 70
     let fill = "#81c784";
-    if (payload.media < 60) fill = "#e57373";
-    else if (payload.media < 80) fill = "#fff176";
+    if (payload.media < 50) fill = "#e57373";
+    else if (payload.media < 70) fill = "#fff176";
 
     return <rect x={cx - size / 2} y={cy - size / 2} width={size} height={size} fill={fill} stroke="#ccc" />;
   };
@@ -414,13 +451,12 @@ const HeatmapVisual = ({ data }: { data: any[] }) => {
 const ScatterVisual = ({ data }: { data: any[] }) => (
   <ResponsiveContainer width="100%" height={400}>
     <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 10 }}>
-      // Check data keys
       <CartesianGrid strokeDasharray="3 3" />
-      <XAxis type="number" dataKey="frequencia" name="Frequência" unit="%" domain={[0, 100]} />
+      <XAxis type="number" dataKey="faltas" name="Faltas" unit="" domain={[0, 'auto']} />
       <YAxis type="number" dataKey="media" name="Média" unit="" domain={[0, 100]} />
       <Tooltip cursor={{ strokeDasharray: '3 3' }} />
       <Legend />
-      <Scatter name="Alunos" data={data} fill="#8884d8" />
+      <Scatter name="Alunos" data={data} fill="#3b82f6" />
     </ScatterChart>
   </ResponsiveContainer>
 );
@@ -432,8 +468,8 @@ const RadarVisual = ({ data }: { data: any[] }) => {
         <PolarGrid />
         <PolarAngleAxis dataKey="subject" />
         <PolarRadiusAxis angle={30} domain={[0, 100]} />
-        <Radar name="Média Geral" dataKey="Média Geral" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-        <Radar name="Assiduidade" dataKey="Assiduidade" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
+        <Radar name="Média Geral" dataKey="Média Geral" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} />
+        <Radar name="Assiduidade" dataKey="Assiduidade" stroke="#10b981" fill="#10b981" fillOpacity={0.6} />
         <Legend />
         <Tooltip />
       </RadarChart>
@@ -441,16 +477,27 @@ const RadarVisual = ({ data }: { data: any[] }) => {
   );
 };
 
-const BarVisual = ({ data }: { data: any[] }) => (
-  <ResponsiveContainer width="100%" height={400}>
-    <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-      <XAxis dataKey="turma" />
-      <YAxis domain={[0, 100]} />
-      <Tooltip />
-      <Legend />
-      <Bar dataKey="media" name="Média da Turma" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-      <Bar dataKey="escola" name="Média da Escola" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-    </BarChart>
-  </ResponsiveContainer>
-);
+const BarVisual = ({ data }: { data: any[] }) => {
+  const theme = useTheme();
+
+  return (
+    <ResponsiveContainer width="100%" height={400}>
+      <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="turma" />
+        <YAxis domain={[0, 100]} />
+        <Tooltip />
+        <Legend />
+        <Bar dataKey="media" name="Média da Turma" radius={[4, 4, 0, 0]}>
+          {data.map((entry, index) => {
+            let color = theme.palette.primary.main;
+            if (entry.delta !== undefined) {
+              color = entry.delta >= 0 ? theme.palette.success.main : theme.palette.error.main;
+            }
+            return <Cell key={`cell-${index}`} fill={color} />;
+          })}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+};

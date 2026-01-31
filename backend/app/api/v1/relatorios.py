@@ -2,6 +2,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt, jwt_required
 from sqlalchemy import func
+from loguru import logger
 
 from ...core.database import session_scope
 from ...models import Aluno, Nota
@@ -46,10 +47,21 @@ def build_turmas_mais_faltas(
     query = session.query(Aluno.turma, func.sum(Nota.faltas).label("faltas")).join(Nota)
     query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
     query = query.group_by(Aluno.turma).order_by(func.sum(Nota.faltas).desc()).limit(10)
-    return [
-        {"turma": turma, "faltas": int(faltas or 0)}
-        for turma, faltas in query.all()
-    ]
+    
+    results = query.all()
+    total_faltas = sum(int(r.faltas or 0) for r in results)
+    turma_critica = results[0].turma if results else "-"
+
+    return {
+        "summary": {
+            "main": {"label": "Total de Faltas", "value": total_faltas, "color": "error"},
+            "secondary": {"label": "Turma Crítica", "value": turma_critica, "color": "warning"}
+        },
+        "data": [
+            {"turma": t, "faltas": int(f or 0)}
+            for t, f in results
+        ]
+    }
 
 
 def build_melhores_medias(
@@ -62,14 +74,24 @@ def build_melhores_medias(
     query = session.query(Aluno.turma, Aluno.turno, func.avg(Nota.total).label("media")).join(Nota)
     query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
     query = query.group_by(Aluno.turma, Aluno.turno).order_by(func.avg(Nota.total).desc()).limit(10)
-    return [
-        {
-            "turma": turma,
-            "turno": turno,
-            "media": round(float(media or 0), 2),
-        }
-        for turma, turno, media in query.all()
-    ]
+    
+    results = query.all()
+    best_turma = results[0].turma if results else "-"
+    
+    avg_school_q = session.query(func.avg(Nota.total)).join(Aluno)
+    avg_school_q = _apply_aluno_filters(avg_school_q, turno, serie, turma, disciplina)
+    avg_perf = avg_school_q.scalar() or 0
+    
+    return {
+        "summary": {
+            "main": {"label": "Melhor Turma", "value": best_turma, "color": "success"},
+            "secondary": {"label": "Média Geral", "value": round(float(avg_perf), 1), "color": "primary"}
+        },
+        "data": [
+            {"turma": t, "turno": tn, "media": round(float(m or 0), 2)}
+            for t, tn, m in results
+        ]
+    }
 
 
 def build_alunos_em_risco(
@@ -79,18 +101,33 @@ def build_alunos_em_risco(
     turma: str | None = None,
     disciplina: str | None = None,
 ):
-    subquery = session.query(Aluno.nome, Aluno.turma, func.avg(Nota.total).label("media")).join(Nota)
-    subquery = _apply_aluno_filters(subquery, turno, serie, turma, disciplina)
-    subquery = (
-        subquery.group_by(Aluno.id)
-        .having(func.avg(Nota.total) < 15)
+    query = session.query(
+        Aluno.nome, 
+        Aluno.turma, 
+        func.avg(Nota.total).label("media"),
+        func.sum(Nota.faltas).label("total_faltas")
+    ).join(Nota)
+    
+    query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
+    query = (
+        query.group_by(Aluno.id, Aluno.nome, Aluno.turma)
+        .having(func.avg(Nota.total) < 50.0)
         .order_by(func.avg(Nota.total))
-        .limit(10)
+        .limit(20)
     )
-    return [
-        {"nome": nome, "turma": turma, "media": round(float(media), 2)}
-        for nome, turma, media in subquery.all()
-    ]
+    
+    results = query.all()
+    
+    return {
+        "summary": {
+            "main": {"label": "Alunos em Risco", "value": len(results), "color": "error"},
+            "secondary": {"label": "Nota de Corte", "value": "< 50.0", "color": "info"}
+        },
+        "data": [
+            {"nome": r.nome, "turma": r.turma, "media": round(float(r.media or 0), 1), "faltas": int(r.total_faltas or 0)}
+            for r in results
+        ]
+    }
 
 
 def build_disciplinas_notas_baixas(
@@ -100,12 +137,6 @@ def build_disciplinas_notas_baixas(
     turma: str | None = None,
     disciplina: str | None = None,
 ):
-    """Lista disciplinas com menores médias, normalizando nomes.
-
-    Ajuste: calcula média ponderada pela quantidade de notas por disciplina
-    (antes fazia média das médias, distorcendo casos com nomes duplicados).
-    """
-
     normalizacao = {
         "ARTES": "ARTE",
         "INGLÊS": "LÍNGUA INGLESA",
@@ -122,25 +153,30 @@ def build_disciplinas_notas_baixas(
     query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
     query = query.group_by(Nota.disciplina)
 
-    acumulado: dict[str, dict[str, float | int]] = {}
-    for disciplina_nome, soma, qtd in query.all():
-        if not disciplina_nome:
-            continue
-        disc_normalizada = normalizacao.get(disciplina_nome.upper(), disciplina_nome)
-        bucket = acumulado.setdefault(disc_normalizada, {"soma": 0.0, "qtd": 0})
+    acumulado = {}
+    for d_nome, soma, qtd in query.all():
+        if not d_nome: continue
+        d_norm = normalizacao.get(d_nome.upper(), d_nome.upper())
+        bucket = acumulado.setdefault(d_norm, {"soma": 0.0, "qtd": 0})
         bucket["soma"] += float(soma or 0)
         bucket["qtd"] += int(qtd or 0)
 
     result = []
-    for disciplina_nome, valores in acumulado.items():
-        total_qtd = valores["qtd"]
-        if not total_qtd:
-            continue
-        media_final = (valores["soma"] / total_qtd) if total_qtd else 0.0
-        result.append({"disciplina": disciplina_nome, "media": round(media_final, 1)})
+    for d_nome, val in acumulado.items():
+        if not val["qtd"]: continue
+        media = val["soma"] / val["qtd"]
+        result.append({"disciplina": d_nome, "media": round(media, 1)})
 
     result.sort(key=lambda x: x["media"])
-    return result
+    critica = result[0]["disciplina"] if result else "-"
+    
+    return {
+        "summary": {
+            "main": {"label": "Disciplina Crítica", "value": critica, "color": "error"},
+            "secondary": {"label": "Média", "value": result[0]["media"] if result else 0, "color": "warning"}
+        },
+        "data": result
+    }
 
 
 def build_melhores_alunos(
@@ -162,18 +198,26 @@ def build_melhores_alunos(
         .order_by(func.avg(Nota.total).desc())
         .limit(10)
     )
-    return [
+    results = query.all()
+    data = [
         {
-            "nome": nome,
-            "turma": turma_nome,
-            "turno": turno_nome,
-            "media": round(float(media or 0), 2),
+            "nome": r.nome,
+            "turma": r.turma,
+            "turno": r.turno,
+            "media": round(float(r.media or 0), 2),
         }
-        for nome, turma_nome, turno_nome, media in query.all()
+        for r in results
     ]
-
-
-
+    
+    best_student = data[0]["nome"] if data else "-"
+    
+    return {
+        "summary": {
+            "main": {"label": "Melhor Aluno(a)", "value": best_student, "color": "success"},
+            "secondary": {"label": "Média", "value": data[0]["media"] if data else 0, "color": "primary"}
+        },
+        "data": data
+    }
 
 
 def build_performance_heatmap(
@@ -191,26 +235,21 @@ def build_performance_heatmap(
     query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
     results = query.group_by(Nota.disciplina, Aluno.turma).all()
     
-    # Normalize discipline names
-    normalizacao = {
-        "ARTES": "ARTE",
-        "INGLÊS": "LÍNGUA INGLESA",
-        "INGLES": "LÍNGUA INGLESA",
-        "LÍNGUA PORTUGUÊSA": "LÍNGUA PORTUGUESA",
-        "LINGUA PORTUGUESA": "LÍNGUA PORTUGUESA",
-    }
-    
     processed = []
     for r in results:
-        disc = r.disciplina.upper() if r.disciplina else "N/A"
-        disc = normalizacao.get(disc, disc)
         processed.append({
-            "disciplina": disc,
+            "disciplina": r.disciplina.upper() if r.disciplina else "N/A",
             "turma": r.turma,
             "media": round(float(r.media or 0), 1)
         })
         
-    return processed
+    return {
+        "summary": {
+            "main": {"label": "Turmas", "value": len(set(p["turma"] for p in processed)), "color": "info"},
+            "secondary": {"label": "Disciplinas", "value": len(set(p["disciplina"] for p in processed)), "color": "secondary"}
+        },
+        "data": processed
+    }
 
 
 def build_attendance_grade_correlation(
@@ -221,28 +260,16 @@ def build_attendance_grade_correlation(
     disciplina: str | None = None,
 ):
     query = session.query(
-        Aluno.turma,
-        func.sum(Nota.faltas).label("total_faltas"),
-        func.avg(Nota.total).label("media_geral"),
-        func.count(Nota.id).label("count_notas") # heuristic for student size equivalent
-    ).join(Nota)
-    query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
-    # Group by Student hiddenly? No, let's group by Student for Scatter plot dots
-    
-    # Actually, scatter plot usually involves individual data points. 
-    # Let's group by Aluno.id
-    query_student = session.query(
         Aluno.nome,
         Aluno.turma,
         func.sum(Nota.faltas).label("total_faltas"),
         func.avg(Nota.total).label("media_geral")
     ).join(Nota).group_by(Aluno.id, Aluno.nome, Aluno.turma)
     
-    query_student = _apply_aluno_filters(query_student, turno, serie, turma, disciplina)
+    query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
+    results = query.having(func.avg(Nota.total) > 0).limit(300).all()
     
-    results = query_student.having(func.avg(Nota.total) > 0).limit(300).all()
-    
-    return [
+    data = [
         {
             "name": r.nome,
             "turma": r.turma,
@@ -251,6 +278,16 @@ def build_attendance_grade_correlation(
         }
         for r in results
     ]
+    
+    avg_f = sum(d["faltas"] for d in data) / len(data) if data else 0
+    
+    return {
+        "summary": {
+            "main": {"label": "Alunos Analisados", "value": len(data), "color": "info"},
+            "secondary": {"label": "Média Faltas", "value": round(avg_f, 1), "color": "warning"}
+        },
+        "data": data
+    }
 
 
 def build_class_radar(
@@ -260,10 +297,6 @@ def build_class_radar(
     turma: str | None = None,
     disciplina: str | None = None,
 ):
-    # Radar comparing Classes
-    # Metrics: Media Geral, Taxa Frequencia (100 - (sum(faltas)/students*?)), let's just use Inverse Faltas or normalized
-    # Let's use: Media Geral, Media Portugues, Media Matematica, Assiduidade (100 - avg_faltas/2 approx)
-    
     query = session.query(
         Aluno.turma,
         func.avg(Nota.total).label("media_geral"),
@@ -271,16 +304,139 @@ def build_class_radar(
     ).join(Nota)
     
     query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
-    results = query.group_by(Aluno.turma).limit(8).all()
+    results = query.group_by(Aluno.turma).limit(10).all()
     
-    return [
+    data = [
         {
-            "subject": r.turma, # Recharts Radar uses 'subject' or 'angleKey'
+            "subject": r.turma,
             "Média Geral": round(float(r.media_geral or 0), 1),
-            "Assiduidade": max(0, 100 - (float(r.media_faltas or 0) * 2)) # Heuristic: 1 absence ~ -2% assiduity
+            "Assiduidade": max(0, 100 - (float(r.media_faltas or 0) * 2))
         }
         for r in results
     ]
+    
+    return {
+        "summary": {
+            "main": {"label": "Turmas", "value": len(data), "color": "info"},
+            "secondary": {"label": "Indicadores", "value": 2, "color": "secondary"}
+        },
+        "data": data
+    }
+
+
+def build_radar_abandono(
+    session,
+    turno: str | None = None,
+    serie: str | None = None,
+    turma: str | None = None,
+    disciplina: str | None = None,
+):
+    query = session.query(
+        Aluno.nome,
+        Aluno.turma,
+        func.avg(Nota.total).label("media"),
+        func.sum(Nota.faltas).label("total_faltas")
+    ).join(Nota)
+    
+    query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
+    query = (
+        query.group_by(Aluno.id, Aluno.nome, Aluno.turma)
+        .having(func.avg(Nota.total) < 50.0)
+        .having(func.sum(Nota.faltas) > 15)
+        .order_by(func.sum(Nota.faltas).desc())
+        .limit(20)
+    )
+    
+    results = query.all()
+    data = [
+        {
+            "nome": r.nome,
+            "turma": r.turma,
+            "media": round(float(r.media or 0), 1),
+            "faltas": int(r.total_faltas or 0),
+            "risco": 0.95
+        }
+        for r in results
+    ]
+    
+    return {
+        "summary": {
+            "main": {"label": "Alunos Críticos", "value": len(data), "color": "error"},
+            "secondary": {"label": "Critério", "value": "Faltas > 15", "color": "warning"}
+        },
+        "data": data
+    }
+
+
+def build_comparativo_eficiencia(
+    session,
+    turno: str | None = None,
+    serie: str | None = None,
+    turma: str | None = None,
+    disciplina: str | None = None,
+):
+    q_global = session.query(func.avg(Nota.total)).join(Aluno)
+    q_global = _apply_aluno_filters(q_global, turno, serie, None, disciplina)
+    global_avg = float(q_global.scalar() or 0)
+    
+    q_turmas = session.query(Aluno.turma, func.avg(Nota.total).label("media")).join(Nota)
+    q_turmas = _apply_aluno_filters(q_turmas, turno, serie, turma, disciplina)
+    results = q_turmas.group_by(Aluno.turma).all()
+    
+    data = []
+    for r in results:
+        m_turma = float(r.media or 0)
+        data.append({
+            "turma": r.turma,
+            "media": round(m_turma, 1),
+            "delta": round(m_turma - global_avg, 1)
+        })
+    
+    data.sort(key=lambda x: x["media"], reverse=True)
+    
+    return {
+        "summary": {
+            "main": {"label": "Média Geral", "value": round(global_avg, 1), "color": "info"},
+            "secondary": {"label": "Turmas", "value": len(data), "color": "primary"}
+        },
+        "data": data
+    }
+
+
+def build_top_movers(
+    session,
+    turno: str | None = None,
+    serie: str | None = None,
+    turma: str | None = None,
+    disciplina: str | None = None,
+):
+    query = session.query(
+        Aluno.nome,
+        Aluno.turma,
+        func.avg(Nota.trimestre2 - Nota.trimestre1).label("delta_avg")
+    ).join(Nota)
+    
+    query = _apply_aluno_filters(query, turno, serie, turma, disciplina)
+    query = query.filter(Nota.trimestre1.isnot(None), Nota.trimestre2.isnot(None))
+    query = query.group_by(Aluno.id, Aluno.nome, Aluno.turma)
+    query = query.order_by(func.abs(func.avg(Nota.trimestre2 - Nota.trimestre1)).desc()).limit(20)
+    
+    results = query.all()
+    data = [
+        {"nome": r.nome, "turma": r.turma, "delta": round(float(r.delta_avg or 0), 1)}
+        for r in results
+    ]
+    
+    max_rise = max([d["delta"] for d in data if d["delta"] > 0], default=0)
+    max_drop = min([d["delta"] for d in data if d["delta"] < 0], default=0)
+    
+    return {
+        "summary": {
+            "main": {"label": "Maior Evolução", "value": f"+{max_rise}", "color": "success"},
+            "secondary": {"label": "Maior Queda", "value": f"{max_drop}", "color": "error"}
+        },
+        "data": data
+    }
 
 
 REPORT_BUILDERS = {
@@ -292,6 +448,9 @@ REPORT_BUILDERS = {
     "performance-heatmap": build_performance_heatmap,
     "attendance-correlation": build_attendance_grade_correlation,
     "class-radar": build_class_radar,
+    "radar-abandono": build_radar_abandono,
+    "comparativo-eficiencia": build_comparativo_eficiencia,
+    "top-movers": build_top_movers,
 }
 
 
@@ -303,20 +462,30 @@ def register(parent: Blueprint) -> None:
     def get_relatorio(slug: str):
         if "aluno" in (get_jwt().get("roles") or []):
             return jsonify({"error": "Acesso restrito"}), 403
+            
         builder = REPORT_BUILDERS.get(slug)
         if not builder:
             return jsonify({"error": "Relatório não encontrado"}), 404
 
-        turno = request.args.get("turno") or None
-        serie = request.args.get("serie") or None
-        turma = request.args.get("turma") or None
-        disciplina = request.args.get("disciplina") or None
-
-        if serie and turma and not turma.strip().upper().startswith(serie.strip().upper()):
-            return jsonify({"error": "A turma selecionada não pertence à série indicada."}), 400
+        params = {
+            "turno": request.args.get("turno"),
+            "serie": request.args.get("serie"),
+            "turma": request.args.get("turma"),
+            "disciplina": request.args.get("disciplina")
+        }
 
         with session_scope() as session:
-            data = builder(session, turno=turno, serie=serie, turma=turma, disciplina=disciplina)
-        return jsonify({"relatorio": slug, "dados": data})
+            try:
+                result = builder(session, **params)
+                if isinstance(result, dict) and "data" in result:
+                    return jsonify({
+                        "relatorio": slug,
+                        "dados": result["data"],
+                        "summary": result.get("summary")
+                    })
+                return jsonify({"relatorio": slug, "dados": result})
+            except Exception as e:
+                logger.error(f"Error building report {slug}: {e}")
+                return jsonify({"error": "Falha ao processar relatório"}), 500
 
     parent.register_blueprint(bp)

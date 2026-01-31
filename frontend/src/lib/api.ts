@@ -237,8 +237,21 @@ type UploadBoletimResponse = {
   turma: string;
 };
 
+type RelatorioSummaryItem = {
+  label: string;
+  value: string | number;
+  color?: "primary" | "secondary" | "success" | "warning" | "danger" | "info";
+};
+
+type RelatorioSummary = {
+  main?: RelatorioSummaryItem;
+  secondary?: RelatorioSummaryItem;
+  extra?: RelatorioSummaryItem;
+};
+
 type RelatorioResponse = {
   relatorio: string;
+  summary?: RelatorioSummary;
   dados: Array<Record<string, unknown>>;
 };
 

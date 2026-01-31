@@ -39,7 +39,7 @@ export const useDerivedRelatorio = (slug: RelatorioSlug | undefined, filters: an
     const { data: notasData, isLoading: isLoadingNotas } = useListNotasQuery(undefined);
 
     const derivedData = useMemo(() => {
-        if (!slug || !notasData) return { dados: [] };
+        if (!slug || !notasData) return { dados: [], summary: undefined };
 
         // Comparativo Eficiencia - Special Handling for Averages
         if (slug === "comparativo-eficiencia") {
@@ -76,7 +76,7 @@ export const useDerivedRelatorio = (slug: RelatorioSlug | undefined, filters: an
 
             if (filters?.turma) comparison = comparison.filter(c => c.turma === filters.turma);
 
-            return { dados: comparison };
+            return { dados: comparison, summary: undefined };
         }
 
         // Standard Filtering for other reports
@@ -111,7 +111,7 @@ export const useDerivedRelatorio = (slug: RelatorioSlug | undefined, filters: an
                 .sort((a, b) => b.risco - a.risco)
                 .slice(0, 50);
 
-            return { dados: riskList };
+            return { dados: riskList, summary: undefined };
         }
 
         if (slug === "top-movers") {
@@ -143,10 +143,10 @@ export const useDerivedRelatorio = (slug: RelatorioSlug | undefined, filters: an
                 .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
                 .slice(0, 20);
 
-            return { dados: movers };
+            return { dados: movers, summary: undefined };
         }
 
-        return { dados: [] };
+        return { dados: [], summary: undefined };
     }, [slug, notasData, filters]);
 
     const isDerived = ["radar-abandono", "top-movers", "comparativo-eficiencia"].includes(slug || "");
