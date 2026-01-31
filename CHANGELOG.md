@@ -20,6 +20,8 @@ All notable changes to this project will be documented in this file.
     - **EJA Support**: Implemented special handling for "Noturno" shift, normalizing grades to EJA cycles (e.g., "7º H" -> "6/7 H", "9º G" -> "8/9 G").
     - **Database Migration**: Cleaned up existing records, consolidating duplicates and enforcing EJA nomenclature.
     - **Auto-Normalization**: Ingestion service now automatically formats class names during PDF uploads to prevent future inconsistencies.
+- **🐛 Bug Fixes**:
+    - **Student Counts**: Resolved an issue where the "Turmas" dashboard displayed incorrect student counts (filtering out students without grades) due to an implicit database join filter.
 
 ## [1.2.1] - 2026-01-30
 

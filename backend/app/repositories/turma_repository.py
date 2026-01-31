@@ -1,5 +1,5 @@
 from typing import List, Tuple, Optional
-from sqlalchemy import func, distinct
+from sqlalchemy import func, distinct, and_
 from sqlalchemy.orm import Session
 
 from app.models import Aluno, Nota
@@ -31,7 +31,15 @@ class TurmaRepository(BaseRepository[Aluno]):
                 func.avg(Nota.faltas).label("faltas_medias"),
             )
             .select_from(Aluno)
-            .outerjoin(Nota, Aluno.id == Nota.aluno_id)
+            .outerjoin(
+                Nota, 
+                and_(
+                    Aluno.id == Nota.aluno_id,
+                    Nota.tenant_id == tenant_id,
+                    Nota.academic_year_id == academic_year_id
+                )
+            )
+            .execution_options(include_all_tenants=True)
         )
 
         if tenant_id:
