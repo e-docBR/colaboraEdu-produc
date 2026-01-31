@@ -17,7 +17,8 @@ All notable changes to this project will be documented in this file.
     - **Reliability**: Fixed TypeScript build errors in the frontend API layer to ensure stable production deployments.
 - **🏫 Turma Standardization**:
     - **Uniform Naming**: Standardized all class names to the `Xº LETRA` format (e.g., "6º A", "7º D").
-    - **Database Migration**: Cleaned up 502 existing records to consolidate duplicates (e.g., merging "6º ANO D" into "6º D").
+    - **EJA Support**: Implemented special handling for "Noturno" shift, normalizing grades to EJA cycles (e.g., "7º H" -> "6/7 H", "9º G" -> "8/9 G").
+    - **Database Migration**: Cleaned up existing records, consolidating duplicates and enforcing EJA nomenclature.
     - **Auto-Normalization**: Ingestion service now automatically formats class names during PDF uploads to prevent future inconsistencies.
 
 ## [1.2.1] - 2026-01-30

@@ -325,7 +325,7 @@ def _extract_student_meta_blocks(text: str) -> list[dict[str, str | None]]:
             turma_content = turma_line.split(":", 1)[1].strip()
             principal = turma_content.split("- -")[0].strip()
             turma_name, turno_name = _split_turma_turno(principal)
-            turma_name = _normalize_turma_name(turma_name)
+            turma_name = _normalize_turma_name(turma_name, turno_name)
         metas.append(
             {
                 "nome": match.group("nome").strip(),
@@ -352,7 +352,8 @@ def _extract_single_student_meta(text: str) -> dict[str, str | None]:
         turma_content = turma_line.split(":", 1)[1].strip()
         principal = turma_content.split("- -")[0].strip()
         turma_name, turno_name = _split_turma_turno(principal)
-        meta["turma"] = _normalize_turma_name(turma_name)
+        turma_name, turno_name = _split_turma_turno(principal)
+        meta["turma"] = _normalize_turma_name(turma_name, turno_name)
         meta["turno"] = turno_name
 
     return meta
@@ -373,9 +374,10 @@ def _split_turma_turno(value: str) -> tuple[str | None, str | None]:
     return (turma or None, turno)
 
 
-def _normalize_turma_name(name: str | None) -> str | None:
-    """Standardizes turma names to 'Xº Y' format.
-    Example: '6º ANO A' -> '6º A', '6A' -> '6º A', '6o A' -> '6º A'
+def _normalize_turma_name(name: str | None, turno: str | None = None) -> str | None:
+    """Standardizes turma names.
+    Standard: 'Xº Y' (e.g., '6º A')
+    EJA (Noturno): 'X/Y Z' (e.g., '6/7 A', '8/9 B')
     """
     if not name:
         return name
@@ -390,16 +392,28 @@ def _normalize_turma_name(name: str | None) -> str | None:
     # 3. Handle numbers followed by letter directly (e.g., 6A -> 6º A)
     # Match digit(s) followed optionally by 'o' or 'º' or 'ª' then space or letter
     match = re.search(r"(?P<num>\d+)\s*(?P<ord>[º°ºªoa])?\s*(?P<letra>[A-Z])$", name)
+    num, letra = None, None
+    
     if match:
         num = match.group("num")
         letra = match.group("letra")
-        return f"{num}º {letra}"
+    else:
+        # 4. Handle just number + letter (no ordinal) at the end if step 3 missed it
+        match_simple = re.search(r"\b(?P<num>\d+)\s+(?P<letra>[A-Z])\b", name)
+        if match_simple:
+            num = match_simple.group("num")
+            letra = match_simple.group("letra")
 
-    # 4. Handle just number + letter (no or dinal) at the end if step 3 missed it
-    # Sometimes it's like 'TURMA 6 A'
-    match = re.search(r"\b(?P<num>\d+)\s+(?P<letra>[A-Z])\b", name)
-    if match:
-        return f"{match.group('num')}º {match.group('letra')}"
+    if num and letra:
+        # Check for EJA (Noturno)
+        is_noturno = turno and "NOTURNO" in turno.upper()
+        if is_noturno:
+            if num in ["6", "7"]:
+                return f"6/7 {letra}"
+            if num in ["8", "9"]:
+                return f"8/9 {letra}"
+        
+        return f"{num}º {letra}"
 
     # 5. Final fallback cleanup
     name = " ".join(name.split())
@@ -499,7 +513,7 @@ def _upsert_aluno(session: Session, record: ParsedAlunoRecord, tenant_id: int | 
         aluno.matricula = record.matricula
 
     if record.turma:
-        aluno.turma = _normalize_turma_name(record.turma)
+        aluno.turma = _normalize_turma_name(record.turma, record.turno)
     if record.turno:
         aluno.turno = record.turno
     
