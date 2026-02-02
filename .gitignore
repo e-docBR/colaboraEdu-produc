@@ -40,3 +40,8 @@ coverage/
 *.pkl
 
 venv/
+
+# Local Data & Debug
+data/
+Mat_Inicial/
+debug_*.py
