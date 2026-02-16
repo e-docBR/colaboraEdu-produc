@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-02-16
+
+### 🚀 Added
+- **🗄️ PostgreSQL Migration**: Officially migrated primary database from SQLite to PostgreSQL for production environments.
+- **✉️ Notification Reliable Delivery**: Fixed critical failures in WhatsApp and Email notification services.
+- **🐳 Infrastructure Hardening**: Standardized `docker-compose.yml` with environment variables for database security and flexibility.
+
+### 🔧 Fixes & Stability
+- **🔄 Worker Resiliency**: Improved background task processing for student occurrences and notifications via Redis/RQ.
+- **🛡️ Database Integrity**: Resolved connection string issues and refined transaction handling for PostgreSQL.
 
 
 ## [1.3.0] - 2026-01-31

@@ -2,9 +2,9 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: colabora_edu
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-colabora_edu}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -28,7 +28,7 @@ services:
     environment:
       FLASK_APP: app
       FLASK_DEBUG: "1"
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/colabora_edu
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-colabora_edu}
       REDIS_URL: redis://redis:6379/0
       ALLOWED_ORIGINS: '["http://localhost:5173", "http://127.0.0.1:5173"]'
       UPLOAD_FOLDER: /data/uploads
@@ -52,7 +52,7 @@ services:
       - ./data:/data
     environment:
       FLASK_APP: app
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/colabora_edu
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-colabora_edu}
       REDIS_URL: redis://redis:6379/0
       UPLOAD_FOLDER: /data/uploads
     depends_on:
